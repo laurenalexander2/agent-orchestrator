@@ -1,0 +1,174 @@
+# claude-swarm Database Schema
+
+SQLite database at .claude-swarm/bus.db (configurable via --db or CLAUDE_SWARM_DB env var).
+Uses WAL journal mode and foreign keys enabled.
+6 tables.
+
+
+## sessions
+
+Registered sessions with status, workstream, and sync tracking.
+
+    CREATE TABLE sessions (
+        id          TEXT PRIMARY KEY,
+        workstream  TEXT NOT NULL,
+        status      TEXT DEFAULT 'running',
+        branch      TEXT,
+        note        TEXT,
+        updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_sync_at DATETIME
+    );
+
+Fields:
+    id           Session identifier (e.g. "A", "B", "orchestrator")
+    workstream   Workstream description (e.g. "frontend", "backend")
+    status       Current status: "running", "blocked", "done"
+    branch       Feature branch name (e.g. "feat/frontend")
+    note         Status message or blocker reason
+    updated_at   Last status update or heartbeat timestamp (UTC ISO 8601)
+    last_sync_at Last sync timestamp (used to filter new context entries)
+
+Behavior:
+- Registered via init command or register_session()
+- updated_at is refreshed on every sync (heartbeat) and every status update
+- last_sync_at is set on each sync; context entries created after this timestamp are returned on next sync
+- If last_sync_at is NULL (first sync), all existing context entries are returned
+
+
+## messages
+
+Inter-session messages with read/unread tracking.
+
+    CREATE TABLE messages (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_id     TEXT NOT NULL,
+        to_id       TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        type        TEXT DEFAULT 'message',
+        status      TEXT DEFAULT 'unread',
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Fields:
+    id          Auto-incrementing message ID
+    from_id     Sender session ID
+    to_id       Recipient session ID
+    body        Message content
+    type        One of: "message", "review_request", "review_approved", "review_rejected"
+    status      One of: "unread", "read"
+    created_at  Creation timestamp (UTC)
+
+Behavior:
+- Messages are created by send_message(), message command, reply command, or automatically by review operations
+- sync marks all unread messages as read and returns them
+- inbox shows unread messages without marking them read
+- review request creates a "review_request" type message to the reviewer
+- review approve creates a "review_approved" type message to the requester
+- review reject creates a "review_rejected" type message to the requester
+
+
+## reviews
+
+Peer review requests with approval/rejection flow.
+
+    CREATE TABLE reviews (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        requester   TEXT NOT NULL,
+        reviewer    TEXT NOT NULL,
+        diff        TEXT,
+        status      TEXT DEFAULT 'pending',
+        comments    TEXT,
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Fields:
+    id          Auto-incrementing review ID
+    requester   Session requesting review (wants to merge)
+    reviewer    Session reviewing (gates the merge)
+    diff        Full diff text
+    status      One of: "pending", "approved"
+    comments    Reviewer comments (set on approve or reject)
+    created_at  Creation timestamp (UTC)
+
+Behavior:
+- Created via review request command
+- Approval sets status to "approved"
+- Rejection resets status to "pending" (not "rejected") — requester must address and re-request
+- merge-ok checks: returns true only if zero reviews with status != "approved" exist for the session
+- can_merge returns true if session has no reviews at all (no reviews = clear to merge)
+
+
+## git_lock
+
+Single-row lock for serializing git pushes.
+
+    CREATE TABLE git_lock (
+        id          INTEGER PRIMARY KEY CHECK (id = 1),
+        held_by     TEXT,
+        acquired_at DATETIME
+    );
+
+Fields:
+    id          Always 1 (single-row table, enforced by CHECK constraint)
+    held_by     Session ID holding the lock, or NULL if not held
+    acquired_at Lock acquisition timestamp
+
+Behavior:
+- Only one row ever exists (id = 1)
+- push command acquires lock (sets held_by to session ID)
+- If lock is held by another session, push waits and retries
+- After push completes (success or failure), lock is released (held_by set to NULL)
+- Prevents concurrent rebase/push collisions
+
+
+## file_claims
+
+Exclusive file ownership per session.
+
+    CREATE TABLE file_claims (
+        file_path   TEXT PRIMARY KEY,
+        session_id  TEXT NOT NULL,
+        claimed_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Fields:
+    file_path   Path to file (primary key — one owner per file)
+    session_id  Claiming session ID
+    claimed_at  Claim timestamp (UTC)
+
+Behavior:
+- claim_file succeeds if file is unclaimed or already claimed by the same session
+- claim_file fails (returns False) if file is claimed by a different session
+- unclaim removes the claim
+- A session can claim multiple files
+- A file can only be claimed by one session at a time
+- Re-claiming the same file by the same session updates the timestamp
+
+
+## shared_context
+
+Team-wide decisions, interfaces, warnings, conventions, discoveries.
+
+    CREATE TABLE shared_context (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id  TEXT NOT NULL,
+        category    TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Fields:
+    id          Auto-incrementing context entry ID
+    session_id  Session that created the entry
+    category    One of: "decision", "interface", "warning", "convention", "discovery"
+    body        Context description text
+    created_at  Creation timestamp (UTC ISO 8601, microsecond precision from Python)
+
+Behavior:
+- Created via context add command
+- context show returns all entries
+- sync returns only entries created after the session's last_sync_at
+- First sync (last_sync_at is NULL) returns all entries
+- Timestamps use Python's datetime with microsecond precision (not SQLite's CURRENT_TIMESTAMP which has second precision) to ensure sync filtering works correctly
+- Categories are validated before insertion; invalid categories raise ValueError
+- Valid categories: decision, interface, warning, convention, discovery

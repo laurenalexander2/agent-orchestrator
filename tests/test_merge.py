@@ -1,8 +1,8 @@
 import os
 import subprocess
 import pytest
-from agent_orchestrator.bus import init_db, register_session, claim_file, get_inbox
-from agent_orchestrator.merge import self_heal_conflict, notify_file_owners
+from claude_swarm.bus import init_db, register_session, claim_file, get_inbox
+from claude_swarm.merge import self_heal_conflict, notify_file_owners
 
 
 @pytest.fixture

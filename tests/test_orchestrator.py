@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime, timezone, timedelta
 import pytest
-from agent_orchestrator.bus import (
+from claude_swarm.bus import (
     init_db,
     register_session,
     update_session,
@@ -11,7 +11,7 @@ from agent_orchestrator.bus import (
     resolve_review,
     get_inbox,
 )
-from agent_orchestrator.orchestrator import (
+from claude_swarm.orchestrator import (
     ORCHESTRATOR_SESSION_ID,
     PollResult,
     poll_tick,

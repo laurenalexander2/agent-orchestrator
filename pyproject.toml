@@ -1,19 +1,18 @@
 [project]
-name = "agent-orchestrator"
-version = "0.2.0"
-description = "CLI for parallel Claude Code sessions to coordinate via message bus, file claims, peer review gates, and git lock management"
+name = "claude-swarm"
+version = "0.3.1"
+description = "CLI for parallel Claude Code sessions to coordinate via shared context, message bus, file claims, peer review gates, and git lock management"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.11"
 authors = [
     {name = "Lauren Alexander"},
 ]
-keywords = ["claude", "claude-code", "agent", "orchestrator", "multi-agent", "coordination"]
+keywords = ["claude", "claude-code", "swarm", "multi-agent", "coordination", "orchestrator"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -26,13 +25,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/laurenalexander2/agent-orchestrator"
-Repository = "https://github.com/laurenalexander2/agent-orchestrator"
-Issues = "https://github.com/laurenalexander2/agent-orchestrator/issues"
+Homepage = "https://github.com/laurenalexander2/claude-swarm"
+Repository = "https://github.com/laurenalexander2/claude-swarm"
+Issues = "https://github.com/laurenalexander2/claude-swarm/issues"
 
 [project.scripts]
-agent-orchestrator = "agent_orchestrator.cli:main"
-ao = "agent_orchestrator.ao:main"
+claude-swarm = "claude_swarm.cli:main"
+ao = "claude_swarm.ao:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]

@@ -1,10 +1,10 @@
-"""Git operations and lock management for agent-orchestrator."""
+"""Git operations and lock management for claude-swarm."""
 
 import subprocess
 import time
 from datetime import datetime, timezone
 
-from agent_orchestrator.bus import _connect, DEFAULT_DB_PATH
+from claude_swarm.bus import _connect, DEFAULT_DB_PATH
 
 
 def _run(args: list[str], repo_path: str = ".") -> tuple[int, str]:

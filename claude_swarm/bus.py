@@ -1,10 +1,10 @@
-"""Message bus and coordination database for agent-orchestrator."""
+"""Message bus and coordination database for claude-swarm."""
 
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_DB_PATH = ".agent-orchestrator/bus.db"
+DEFAULT_DB_PATH = ".claude-swarm/bus.db"
 
 
 def _connect(db_path: str | None = None) -> sqlite3.Connection:
@@ -27,7 +27,8 @@ def init_db(path: str | None = None) -> None:
             status      TEXT DEFAULT 'running',
             branch      TEXT,
             note        TEXT,
-            updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_sync_at DATETIME
         );
 
         CREATE TABLE IF NOT EXISTS messages (
@@ -62,8 +63,21 @@ def init_db(path: str | None = None) -> None:
             claimed_at  DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS shared_context (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  TEXT NOT NULL,
+            category    TEXT NOT NULL,
+            body        TEXT NOT NULL,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
         INSERT OR IGNORE INTO git_lock (id, held_by, acquired_at) VALUES (1, NULL, NULL);
     """)
+    # Migration for existing databases that don't have last_sync_at
+    try:
+        conn.execute("ALTER TABLE sessions ADD COLUMN last_sync_at DATETIME")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     conn.commit()
     conn.close()
 
@@ -144,7 +158,7 @@ def create_review(requester: str, reviewer: str, diff: str, *, db_path: str | No
     # Notify the reviewer via a message so it shows up in their inbox
     send_message(
         requester, reviewer,
-        f"Review #{review_id} requested — run 'agent-orchestrator review show {review_id}' to see diff",
+        f"Review #{review_id} requested — run 'claude-swarm review show {review_id}' to see diff",
         type="review_request",
         db_path=db_path,
     )
@@ -278,3 +292,95 @@ def release_all_claims(session_id: str, *, db_path: str | None = None) -> None:
     conn.execute("DELETE FROM file_claims WHERE session_id = ?", (session_id,))
     conn.commit()
     conn.close()
+
+
+# --- Shared Context ---
+
+VALID_CATEGORIES = ("decision", "interface", "warning", "convention", "discovery")
+
+
+def add_context(session_id: str, body: str, category: str, *, db_path: str | None = None) -> int:
+    if category not in VALID_CATEGORIES:
+        raise ValueError(f"Invalid category '{category}'. Must be one of: {VALID_CATEGORIES}")
+    conn = _connect(db_path)
+    now = datetime.now(timezone.utc).isoformat()
+    cur = conn.execute(
+        "INSERT INTO shared_context (session_id, category, body, created_at) VALUES (?, ?, ?, ?)",
+        (session_id, category, body, now),
+    )
+    conn.commit()
+    ctx_id = cur.lastrowid
+    conn.close()
+    return ctx_id
+
+
+def get_context(*, db_path: str | None = None) -> list[dict]:
+    conn = _connect(db_path)
+    rows = conn.execute(
+        "SELECT * FROM shared_context ORDER BY created_at"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_context_since(timestamp: str, *, db_path: str | None = None) -> list[dict]:
+    conn = _connect(db_path)
+    rows = conn.execute(
+        "SELECT * FROM shared_context WHERE created_at > ? ORDER BY created_at",
+        (timestamp,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# --- Sync ---
+
+def sync_session(session_id: str, *, db_path: str | None = None) -> dict:
+    """Perform a sync: check inbox, get new context, update heartbeat.
+
+    Returns dict with keys:
+        messages: list[dict] - new unread messages (now marked as read)
+        context: list[dict] - new context entries since last sync
+    """
+    conn = _connect(db_path)
+    now = datetime.now(timezone.utc).isoformat()
+
+    # 1. Get last_sync_at
+    session = conn.execute(
+        "SELECT last_sync_at FROM sessions WHERE id = ?", (session_id,)
+    ).fetchone()
+    last_sync = session["last_sync_at"] if session else None
+
+    # 2. Get unread messages
+    messages = conn.execute(
+        "SELECT * FROM messages WHERE to_id = ? AND status = 'unread' ORDER BY created_at",
+        (session_id,),
+    ).fetchall()
+    messages = [dict(m) for m in messages]
+
+    # 3. Mark messages as read
+    for m in messages:
+        conn.execute("UPDATE messages SET status = 'read' WHERE id = ?", (m["id"],))
+
+    # 4. Get new context entries
+    if last_sync:
+        context_rows = conn.execute(
+            "SELECT * FROM shared_context WHERE created_at > ? ORDER BY created_at",
+            (last_sync,),
+        ).fetchall()
+    else:
+        context_rows = conn.execute(
+            "SELECT * FROM shared_context ORDER BY created_at"
+        ).fetchall()
+    context = [dict(r) for r in context_rows]
+
+    # 5. Update heartbeat and last_sync_at
+    conn.execute(
+        "UPDATE sessions SET updated_at = ?, last_sync_at = ? WHERE id = ?",
+        (now, now, session_id),
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {"messages": messages, "context": context}

@@ -1,10 +1,10 @@
-"""Conflict self-healing and arbitration for agent-orchestrator."""
+"""Conflict self-healing and arbitration for claude-swarm."""
 
 import os
 import re
 import subprocess
 
-from agent_orchestrator.bus import get_claims, send_message
+from claude_swarm.bus import get_claims, send_message
 
 
 def _run(args: list[str], repo_path: str = ".") -> tuple[int, str]:

@@ -1,0 +1,450 @@
+# claude-swarm — Complete Reference
+
+> CLI for parallel Claude Code sessions to coordinate via SQLite.
+
+claude-swarm lets multiple AI coding agents (Claude Code sessions) working on the same codebase stay in sync, communicate, claim files, review each other's work, and push safely through a shared git lock. All state lives in a single SQLite database. No external services, no Redis, no message queues.
+
+
+## Install
+
+    pip install claude-swarm
+
+    # or via Homebrew
+    brew tap laurenalexander2/tap && brew install claude-swarm
+
+Requires Python 3.11+. Dependencies: click >= 8.0, rich >= 13.0.
+
+
+## Quick Start
+
+    ao setup                                    # verify Claude Code is installed
+    ao start "Build a REST API with auth"       # launch orchestrator mode
+
+What ao start does:
+1. Checks Claude Code CLI is installed
+2. Creates .claude-swarm/ directory
+3. Writes/appends CLAUDE.md with full coordination protocol
+4. Launches Claude Code with an orchestrator prompt
+5. The orchestrator decomposes the project into workstreams
+6. Prints copy-pasteable prompts for each session (one per terminal)
+7. You paste each prompt into a separate Claude Code terminal
+8. The orchestrator monitors all sessions via the SQLite bus
+
+Manual setup alternative:
+
+    claude-swarm init --sessions "A:frontend B:backend C:infra"
+    claude-swarm status
+
+
+## Workflow (Recommended Process)
+
+1. Pull before starting
+2. Sync between every task (claude-swarm sync --session ID)
+3. Share decisions via context add whenever you make a choice that affects others
+4. Claim files before editing to prevent concurrent edits
+5. Update status when starting, blocking, or completing work
+6. Commit often with small, focused commits
+7. Request review when ready to merge
+8. Wait for merge-ok before pushing
+9. Push only via the CLI (never raw git push) — respects the lock
+10. Never force push
+
+
+## Global Options
+
+    claude-swarm --db PATH COMMAND
+    export CLAUDE_SWARM_DB=".claude-swarm/bus.db"
+    claude-swarm --version
+
+
+## Commands
+
+
+### claude-swarm sync --session SESSION_ID
+
+The most important command. Run between every task. Does three things in one call:
+1. Checks inbox (returns new messages, marks them read)
+2. Reads shared context (only entries since last sync)
+3. Sends heartbeat (so orchestrator knows the session is alive)
+
+Options:
+    --session  (required)  Session ID to sync
+
+Output when nothing new: silent (no output, exit 0)
+Output when something new:
+    [SYNC] 1 new message(s), 2 new context
+    MSG from=B: "Auth types are exported now"
+    CTX [decision] by=B: "JWT for auth, not session cookies"
+    CTX [interface] by=C: "POST /users returns {id, email, created_at}"
+
+
+### claude-swarm context add BODY --session SESSION_ID --category CATEGORY
+
+Add a shared context entry. Categories: decision, interface, warning, convention, discovery.
+
+Options:
+    --session   (required)  Session ID
+    --category  (required)  One of: decision, interface, warning, convention, discovery
+
+Examples:
+    claude-swarm context add "API uses snake_case for all fields" --session A --category decision
+    claude-swarm context add "POST /users returns {id, email, created_at}" --session B --category interface
+    claude-swarm context add "Don't touch src/db.py — migration in progress" --session C --category warning
+
+
+### claude-swarm context show
+
+Show all shared context entries. Prints table: ID, Session, Category, Body, Created.
+
+
+### claude-swarm message TO_ID BODY --from FROM_ID
+
+Send a message to another session.
+
+Arguments:
+    TO_ID   Recipient session ID
+    BODY    Message text
+Options:
+    --from  (required)  Sender session ID
+
+Example:
+    claude-swarm message B "Can you expose the auth types?" --from A
+
+
+### claude-swarm inbox --session SESSION_ID
+
+Check unread messages and pending reviews for a session.
+
+Options:
+    --session  (required)  Session ID
+
+Shows unread messages (table: ID, From, Body, Type, Time) and pending reviews assigned to this session.
+
+
+### claude-swarm reply MESSAGE_ID BODY --from FROM_ID
+
+Reply to a message. Marks original as read, sends reply to original sender.
+
+Arguments:
+    MESSAGE_ID  ID of message to reply to (integer)
+    BODY        Reply text
+Options:
+    --from  (required)  Sender session ID
+
+Example:
+    claude-swarm reply 1 "Done, exported from auth/types.ts" --from B
+
+
+### claude-swarm init --sessions "A:frontend B:backend C:infra"
+
+Initialize the database and register sessions.
+
+Options:
+    --sessions  (required)  Space-separated "ID:workstream" pairs
+
+Each session gets status "running" and branch "feat/{workstream}".
+
+
+### claude-swarm status
+
+Show all sessions. Prints table: ID, Workstream, Status, Branch, Note, Updated.
+
+
+### claude-swarm update SESSION_ID --status STATUS --note NOTE
+
+Update a session's status or note.
+
+Arguments:
+    SESSION_ID  Session to update
+Options:
+    --status  New status: running, blocked, done
+    --note    Status note
+
+Examples:
+    claude-swarm update A --status blocked --note "waiting on B for types"
+    claude-swarm update A --status running --note "implementing rate limiter"
+
+
+### claude-swarm claim FILE_PATH --session SESSION_ID
+
+Claim a file for exclusive editing.
+
+Arguments:
+    FILE_PATH  Path to file
+Options:
+    --session  (required)  Session ID
+
+Exit 0 on success. Exit 1 if already claimed by another session.
+
+Example:
+    claude-swarm claim src/auth/middleware.py --session A
+
+
+### claude-swarm claims
+
+List all active file claims. Prints table: File, Session, Claimed At.
+
+
+### claude-swarm unclaim FILE_PATH --session SESSION_ID
+
+Release a file claim.
+
+Arguments:
+    FILE_PATH  Path to file
+Options:
+    --session  (required)  Session ID
+
+Example:
+    claude-swarm unclaim src/auth/middleware.py --session A
+
+
+### claude-swarm review request --from FROM_ID --to TO_ID --diff DIFF_TEXT
+
+Request a review from another session.
+
+Options:
+    --from  (required)  Requester session ID
+    --to    (required)  Reviewer session ID
+    --diff  (required)  Diff content
+
+Example:
+    claude-swarm review request --from A --to B --diff "$(git diff main)"
+
+
+### claude-swarm review list
+
+List all reviews. Prints table: ID, Requester, Reviewer, Status, Comments, Created.
+
+
+### claude-swarm review show REVIEW_ID
+
+Show details of a review: Requester, Reviewer, Status, Comments, full Diff.
+
+Arguments:
+    REVIEW_ID  Review ID (integer)
+
+
+### claude-swarm review approve REVIEW_ID --from FROM_ID --comment COMMENT
+
+Approve a review.
+
+Arguments:
+    REVIEW_ID  Review ID (integer)
+Options:
+    --from     (required)  Reviewer session ID
+    --comment  (optional, default "")  Approval comment
+
+Sends approval notification to requester. Requester can now pass merge-ok.
+
+
+### claude-swarm review reject REVIEW_ID --from FROM_ID --comment COMMENT
+
+Reject a review.
+
+Arguments:
+    REVIEW_ID  Review ID (integer)
+Options:
+    --from     (required)  Reviewer session ID
+    --comment  (optional, default "")  Rejection reason
+
+Resets status to pending. Sends rejection notification to requester.
+
+
+### claude-swarm merge-ok SESSION_ID
+
+Check if a session is clear to merge.
+
+Arguments:
+    SESSION_ID  Session to check
+
+Exit 0 if clear (all reviews approved or no reviews). Exit 1 if any pending reviews.
+
+
+### claude-swarm commit DESCRIPTION --session SESSION_ID
+
+Commit staged changes with session-prefixed message.
+
+Arguments:
+    DESCRIPTION  Commit message
+Options:
+    --session  (required)  Session ID
+
+Message format: "[Session A] add PII detection middleware"
+
+
+### claude-swarm push --session SESSION_ID
+
+Push changes. Acquires git lock, rebases, pushes, releases lock.
+
+Options:
+    --session  (required)  Session ID
+
+On failure: sets session status to "blocked" with note "push failed".
+
+
+### claude-swarm pull --session SESSION_ID
+
+Pull and rebase on latest.
+
+Options:
+    --session  (required)  Session ID
+
+
+### claude-swarm git-status
+
+Show git status.
+
+
+### claude-swarm git-diff --staged
+
+Show git diff.
+
+Options:
+    --staged  (flag)  Show only staged changes
+
+
+### claude-swarm git-log
+
+Show recent git log.
+
+
+### claude-swarm orchestrate run
+
+Start the orchestrator poll loop.
+
+    claude-swarm orchestrate run --interval 10 --auto-approve --stale-minutes 15 --quiet
+
+Options:
+    --interval       (default 10)   Poll interval in seconds
+    --auto-approve   (flag)         Auto-approve reviews assigned to orchestrator
+    --stale-minutes  (default 15)   Minutes before session is considered stale
+    --quiet          (flag)         Only print when there are events
+
+Detects blocked sessions, stale sessions, pending reviews, unread messages.
+
+
+### claude-swarm orchestrate dashboard
+
+One-shot status view: sessions, messages, reviews, file claims.
+
+
+### ao setup
+
+Check that Claude Code CLI is installed. Exit 0 if found, exit 1 if not.
+
+
+### ao start DESCRIPTION --project-dir DIR
+
+Launch orchestrator mode.
+
+Arguments:
+    DESCRIPTION  Project description
+Options:
+    --project-dir  (default ".")  Project directory
+
+
+## Architecture
+
+    claude_swarm/
+    ├── bus.py          # SQLite message bus (sessions, messages, reviews, claims, context, sync)
+    ├── git.py          # Git operations + push lock management
+    ├── merge.py        # Conflict self-healing + file owner notifications
+    ├── orchestrator.py # Poll loop, blocked/stale detection, auto-approve
+    ├── cli.py          # Click CLI commands (thin layer over other modules)
+    └── ao.py           # Quick-start entry point (ao setup, ao start)
+
+
+## Database Schema (6 tables)
+
+
+### sessions
+
+    CREATE TABLE sessions (
+        id          TEXT PRIMARY KEY,
+        workstream  TEXT NOT NULL,
+        status      TEXT DEFAULT 'running',
+        branch      TEXT,
+        note        TEXT,
+        updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_sync_at DATETIME
+    );
+
+Fields: id (e.g. "A"), workstream (e.g. "frontend"), status (running/blocked/done), branch (e.g. "feat/frontend"), note (blocker reason), updated_at (heartbeat), last_sync_at (for context filtering).
+
+
+### messages
+
+    CREATE TABLE messages (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_id     TEXT NOT NULL,
+        to_id       TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        type        TEXT DEFAULT 'message',
+        status      TEXT DEFAULT 'unread',
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Types: "message", "review_request", "review_approved", "review_rejected". Status: "unread", "read".
+
+
+### reviews
+
+    CREATE TABLE reviews (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        requester   TEXT NOT NULL,
+        reviewer    TEXT NOT NULL,
+        diff        TEXT,
+        status      TEXT DEFAULT 'pending',
+        comments    TEXT,
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Status: "pending", "approved". Rejection resets to "pending". merge-ok checks for zero non-approved reviews.
+
+
+### git_lock
+
+    CREATE TABLE git_lock (
+        id          INTEGER PRIMARY KEY CHECK (id = 1),
+        held_by     TEXT,
+        acquired_at DATETIME
+    );
+
+Single-row table. held_by is session ID or NULL. Serializes pushes to prevent rebase collisions.
+
+
+### file_claims
+
+    CREATE TABLE file_claims (
+        file_path   TEXT PRIMARY KEY,
+        session_id  TEXT NOT NULL,
+        claimed_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+One owner per file. claim fails if claimed by different session. Same session can re-claim.
+
+
+### shared_context
+
+    CREATE TABLE shared_context (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id  TEXT NOT NULL,
+        category    TEXT NOT NULL,
+        body        TEXT NOT NULL,
+        created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+Categories: "decision", "interface", "warning", "convention", "discovery". Timestamps use Python microsecond precision for sync filtering.
+
+
+## Testing
+
+90 tests. Run with:
+
+    pytest tests/ -v
+
+
+## Source
+
+- GitHub: https://github.com/laurenalexander2/claude-swarm
+- PyPI: https://pypi.org/project/claude-swarm/

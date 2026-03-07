@@ -1,4 +1,4 @@
-"""Orchestrator poll loop and coordination logic for agent-orchestrator."""
+"""Orchestrator poll loop and coordination logic for claude-swarm."""
 
 import time
 from dataclasses import dataclass, field
@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from rich.console import Console
 from rich.table import Table
 
-from agent_orchestrator import bus
+from claude_swarm import bus
 
 ORCHESTRATOR_SESSION_ID = "orchestrator"
 
@@ -132,7 +132,7 @@ def render_tick(result: PollResult, *, quiet: bool = False) -> None:
     for r in result.pending_reviews:
         console.print(
             f"  [magenta]REVIEW: #{r['id']} from {r['requester']} pending "
-            f"— run: agent-orchestrator review show {r['id']}[/magenta]"
+            f"— run: claude-swarm review show {r['id']}[/magenta]"
         )
 
     # Actions taken

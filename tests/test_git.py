@@ -4,8 +4,8 @@ import subprocess
 import threading
 import time
 import pytest
-from agent_orchestrator.bus import init_db
-from agent_orchestrator import git as agent_git
+from claude_swarm.bus import init_db
+from claude_swarm import git as agent_git
 
 
 @pytest.fixture

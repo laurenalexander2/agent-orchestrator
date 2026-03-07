@@ -1,4 +1,4 @@
-"""CLI interface for agent-orchestrator."""
+"""CLI interface for claude-swarm."""
 
 import sys
 
@@ -6,9 +6,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from agent_orchestrator import bus
-from agent_orchestrator import git as agent_git
-from agent_orchestrator import orchestrator
+from claude_swarm import bus
+from claude_swarm import git as agent_git
+from claude_swarm import orchestrator
 
 console = Console()
 
@@ -18,7 +18,8 @@ def _db(ctx):
 
 
 @click.group()
-@click.option("--db", default=None, help="Path to bus database", envvar="AGENT_ORCHESTRATOR_DB")
+@click.version_option(package_name="claude-swarm")
+@click.option("--db", default=None, help="Path to bus database", envvar="CLAUDE_SWARM_DB")
 @click.pass_context
 def main(ctx, db):
     ctx.ensure_object(dict)
@@ -104,7 +105,7 @@ def inbox(ctx, session):
     if pending_reviews:
         console.print(f"[bold yellow]You have {len(pending_reviews)} pending review(s) to action[/bold yellow]")
         for r in pending_reviews:
-            console.print(f"  Review #{r['id']} from {r['requester']} — run: agent-orchestrator review show {r['id']}")
+            console.print(f"  Review #{r['id']} from {r['requester']} — run: claude-swarm review show {r['id']}")
         console.print()
 
     if not messages and not pending_reviews:
@@ -312,6 +313,81 @@ def unclaim(ctx, file_path, session):
     """Release a file claim."""
     bus.release_claim(session, file_path, db_path=_db(ctx))
     console.print(f"[green]{session} released {file_path}[/green]")
+
+
+# --- Shared Context ---
+
+@main.group()
+@click.pass_context
+def context(ctx):
+    """Shared context management commands."""
+    pass
+
+
+@context.command()
+@click.argument("body")
+@click.option("--session", required=True, help="Session ID adding the context")
+@click.option("--category", required=True,
+              type=click.Choice(["decision", "interface", "warning", "convention", "discovery"]),
+              help="Context category")
+@click.pass_context
+def add(ctx, body, session, category):
+    """Add a shared context entry."""
+    ctx_id = bus.add_context(session, body, category, db_path=_db(ctx.parent))
+    console.print(f"[green]Context #{ctx_id} added ({category})[/green]")
+
+
+@context.command()
+@click.pass_context
+def show(ctx):
+    """Show all shared context entries."""
+    entries = bus.get_context(db_path=_db(ctx.parent))
+    if not entries:
+        console.print("[dim]No shared context entries[/dim]")
+        return
+
+    table = Table(title="Shared Context")
+    table.add_column("ID")
+    table.add_column("Session")
+    table.add_column("Category")
+    table.add_column("Body")
+    table.add_column("Created")
+
+    for e in entries:
+        table.add_row(
+            str(e["id"]), e["session_id"], e["category"],
+            e["body"], e["created_at"],
+        )
+    console.print(table)
+
+
+# --- Sync ---
+
+@main.command()
+@click.option("--session", required=True, help="Session ID to sync")
+@click.pass_context
+def sync(ctx, session):
+    """Sync: check inbox, read new context, heartbeat. Silent when nothing new."""
+    result = bus.sync_session(session, db_path=_db(ctx))
+
+    messages = result["messages"]
+    context_entries = result["context"]
+
+    if not messages and not context_entries:
+        return
+
+    parts = []
+    if messages:
+        parts.append(f"{len(messages)} new message(s)")
+    if context_entries:
+        parts.append(f"{len(context_entries)} new context")
+    click.echo(f"[SYNC] {', '.join(parts)}")
+
+    for m in messages:
+        click.echo(f"MSG from={m['from_id']}: \"{m['body']}\"")
+
+    for e in context_entries:
+        click.echo(f"CTX [{e['category']}] by={e['session_id']}: \"{e['body']}\"")
 
 
 # --- Git Operations ---

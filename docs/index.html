@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>claude-swarm</title>
+</head>
+<body>
+<h1>claude-swarm</h1>
+<p>CLI for parallel Claude Code sessions to coordinate via SQLite. Sessions share context, sync automatically, claim files, request peer reviews, and push safely through a shared git lock.</p>
+
+<h2>Install</h2>
+<pre>pip install claude-swarm</pre>
+<pre>brew tap laurenalexander2/tap && brew install claude-swarm</pre>
+
+<h2>Quick Start</h2>
+<pre>ao setup                              # verify Claude Code is installed
+ao start "Build a REST API with auth"  # launch orchestrator mode</pre>
+
+<h2>Documentation</h2>
+<ul>
+<li><a href="llms.txt">llms.txt</a> — Overview and command summary (point LLMs here first)</li>
+<li><a href="llms-full.txt">llms-full.txt</a> — Complete reference: every command, every schema table, workflow</li>
+<li><a href="commands.txt">commands.txt</a> — CLI command reference only</li>
+<li><a href="schema.txt">schema.txt</a> — Database schema only</li>
+</ul>
+
+<h2>Links</h2>
+<ul>
+<li><a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a></li>
+<li><a href="https://pypi.org/project/claude-swarm/">PyPI</a></li>
+</ul>
+
+<p>MIT License</p>
+</body>
+</html>

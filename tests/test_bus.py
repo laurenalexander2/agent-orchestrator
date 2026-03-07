@@ -1,7 +1,9 @@
 import os
 import tempfile
 import pytest
-from agent_orchestrator.bus import (
+import sqlite3
+import time
+from claude_swarm.bus import (
     init_db,
     register_session,
     update_session,
@@ -19,6 +21,10 @@ from agent_orchestrator.bus import (
     release_claim,
     get_claims,
     release_all_claims,
+    add_context,
+    get_context,
+    get_context_since,
+    sync_session,
 )
 
 
@@ -221,3 +227,113 @@ class TestGetAllMessages:
         # unread_only=False should include it
         all_msgs = get_all_messages(unread_only=False, db_path=db_path)
         assert any(m["body"] == "msg1" for m in all_msgs)
+
+
+class TestSharedContext:
+    def test_add_and_get_context(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        ctx_id = add_context("A", "API uses snake_case", "decision", db_path=db_path)
+        assert ctx_id > 0
+        entries = get_context(db_path=db_path)
+        assert len(entries) == 1
+        assert entries[0]["body"] == "API uses snake_case"
+        assert entries[0]["category"] == "decision"
+        assert entries[0]["session_id"] == "A"
+
+    def test_invalid_category_raises(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        with pytest.raises(ValueError, match="Invalid category"):
+            add_context("A", "something", "invalid_category", db_path=db_path)
+
+    def test_get_context_since_filters_by_time(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        add_context("A", "first", "decision", db_path=db_path)
+        time.sleep(0.05)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        ts = conn.execute("SELECT created_at FROM shared_context ORDER BY id DESC LIMIT 1").fetchone()["created_at"]
+        conn.close()
+        time.sleep(0.05)
+        add_context("A", "second", "interface", db_path=db_path)
+        entries = get_context_since(ts, db_path=db_path)
+        assert len(entries) == 1
+        assert entries[0]["body"] == "second"
+
+    def test_multiple_sessions_contribute_context(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        add_context("A", "decision from A", "decision", db_path=db_path)
+        add_context("B", "warning from B", "warning", db_path=db_path)
+        entries = get_context(db_path=db_path)
+        assert len(entries) == 2
+        sessions = {e["session_id"] for e in entries}
+        assert sessions == {"A", "B"}
+
+    def test_all_valid_categories_accepted(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        for cat in ("decision", "interface", "warning", "convention", "discovery"):
+            ctx_id = add_context("A", f"test {cat}", cat, db_path=db_path)
+            assert ctx_id > 0
+
+
+class TestSyncSession:
+    def test_sync_returns_unread_messages(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        send_message("B", "A", "hello", db_path=db_path)
+        result = sync_session("A", db_path=db_path)
+        assert len(result["messages"]) == 1
+        assert result["messages"][0]["body"] == "hello"
+
+    def test_sync_marks_messages_as_read(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        send_message("B", "A", "hello", db_path=db_path)
+        sync_session("A", db_path=db_path)
+        result = sync_session("A", db_path=db_path)
+        assert len(result["messages"]) == 0
+
+    def test_sync_returns_context_since_last_sync(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        add_context("B", "old context", "decision", db_path=db_path)
+        result1 = sync_session("A", db_path=db_path)
+        assert len(result1["context"]) == 1
+        time.sleep(0.05)
+        add_context("B", "new context", "interface", db_path=db_path)
+        result2 = sync_session("A", db_path=db_path)
+        assert len(result2["context"]) == 1
+        assert result2["context"][0]["body"] == "new context"
+
+    def test_sync_updates_heartbeat(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        sessions_before = get_all_sessions(db_path=db_path)
+        before_ts = sessions_before[0]["updated_at"]
+        time.sleep(0.05)
+        sync_session("A", db_path=db_path)
+        sessions_after = get_all_sessions(db_path=db_path)
+        after_ts = sessions_after[0]["updated_at"]
+        assert after_ts > before_ts
+
+    def test_sync_updates_last_sync_at(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        sync_session("A", db_path=db_path)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT last_sync_at FROM sessions WHERE id = 'A'").fetchone()
+        conn.close()
+        assert row["last_sync_at"] is not None
+
+    def test_sync_empty_returns_no_messages_no_context(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        result = sync_session("A", db_path=db_path)
+        assert len(result["messages"]) == 0
+        assert len(result["context"]) == 0
+
+    def test_first_sync_returns_all_existing_context(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        add_context("B", "entry1", "decision", db_path=db_path)
+        add_context("B", "entry2", "interface", db_path=db_path)
+        result = sync_session("A", db_path=db_path)
+        assert len(result["context"]) == 2

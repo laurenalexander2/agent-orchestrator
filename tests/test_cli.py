@@ -1,8 +1,8 @@
 import os
 import pytest
 from click.testing import CliRunner
-from agent_orchestrator.cli import main
-from agent_orchestrator.bus import init_db
+from claude_swarm.cli import main
+from claude_swarm.bus import init_db
 
 
 @pytest.fixture
@@ -175,3 +175,77 @@ class TestOrchestrateDashboard:
         result = runner.invoke(main, [*_db(db_path), "orchestrate", "dashboard"])
         assert result.exit_code == 0
         assert "hello" in result.output
+
+
+class TestContextCommands:
+    def test_context_add_and_show(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk"])
+        result = runner.invoke(main, [*_db(db_path), "context", "add", "API uses snake_case",
+                                      "--session", "A", "--category", "decision"])
+        assert result.exit_code == 0
+        assert "Context #" in result.output
+
+        result = runner.invoke(main, [*_db(db_path), "context", "show"])
+        assert result.exit_code == 0
+        assert "snake_case" in result.output
+        assert "decision" in result.output
+
+    def test_context_show_empty(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk"])
+        result = runner.invoke(main, [*_db(db_path), "context", "show"])
+        assert result.exit_code == 0
+        assert "No shared context" in result.output
+
+    def test_context_invalid_category_rejected(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk"])
+        result = runner.invoke(main, [*_db(db_path), "context", "add", "test",
+                                      "--session", "A", "--category", "invalid"])
+        assert result.exit_code != 0
+
+
+class TestSyncCommand:
+    def test_sync_silent_when_nothing_new(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk"])
+        result = runner.invoke(main, [*_db(db_path), "sync", "--session", "A"])
+        assert result.exit_code == 0
+        assert result.output.strip() == ""
+
+    def test_sync_shows_new_messages(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk B:ts-sdk"])
+        runner.invoke(main, [*_db(db_path), "message", "A", "hello from B", "--from", "B"])
+        result = runner.invoke(main, [*_db(db_path), "sync", "--session", "A"])
+        assert result.exit_code == 0
+        assert "[SYNC]" in result.output
+        assert "MSG" in result.output
+        assert "hello from B" in result.output
+
+    def test_sync_shows_new_context(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk B:ts-sdk"])
+        runner.invoke(main, [*_db(db_path), "context", "add", "use snake_case",
+                             "--session", "B", "--category", "decision"])
+        result = runner.invoke(main, [*_db(db_path), "sync", "--session", "A"])
+        assert result.exit_code == 0
+        assert "CTX" in result.output
+        assert "snake_case" in result.output
+
+    def test_sync_second_call_silent(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk B:ts-sdk"])
+        runner.invoke(main, [*_db(db_path), "message", "A", "hello", "--from", "B"])
+        runner.invoke(main, [*_db(db_path), "sync", "--session", "A"])
+        result = runner.invoke(main, [*_db(db_path), "sync", "--session", "A"])
+        assert result.output.strip() == ""
+
+    def test_sync_marks_messages_read(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "A:python-sdk B:ts-sdk"])
+        runner.invoke(main, [*_db(db_path), "message", "A", "hello", "--from", "B"])
+        runner.invoke(main, [*_db(db_path), "sync", "--session", "A"])
+        result = runner.invoke(main, [*_db(db_path), "inbox", "--session", "A"])
+        assert "hello" not in result.output

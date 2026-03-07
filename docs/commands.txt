@@ -1,0 +1,322 @@
+# claude-swarm CLI Reference
+
+All commands accept a global --db option or CLAUDE_SWARM_DB environment variable to specify the database path.
+
+    claude-swarm --db PATH COMMAND
+    export CLAUDE_SWARM_DB=".claude-swarm/bus.db"
+
+    claude-swarm --version    # prints: claude-swarm, version X.Y.Z
+
+
+## Sync
+
+The most important command. Run between every task. Checks inbox, reads new shared context, sends heartbeat — all in one call.
+
+    claude-swarm sync --session SESSION_ID
+
+Options:
+    --session  (required)  Session ID to sync
+
+Output when nothing new: silent (no output, exit 0)
+Output when something new:
+    [SYNC] 1 new message(s), 2 new context
+    MSG from=B: "Auth types are exported now"
+    CTX [decision] by=B: "JWT for auth, not session cookies"
+
+Messages are marked as read after sync. Context is tracked via last_sync_at timestamp — only entries created after the last sync are shown.
+
+
+## Shared Context
+
+A team wiki that all sessions read and write. Categories: decision, interface, warning, convention, discovery.
+
+### context add
+
+    claude-swarm context add BODY --session SESSION_ID --category CATEGORY
+
+Options:
+    --session   (required)  Session ID adding the context
+    --category  (required)  One of: decision, interface, warning, convention, discovery
+
+Example:
+    claude-swarm context add "API uses snake_case for all fields" --session A --category decision
+    claude-swarm context add "POST /users returns {id, email, created_at}" --session B --category interface
+    claude-swarm context add "Don't touch src/db.py — migration in progress" --session C --category warning
+
+### context show
+
+    claude-swarm context show
+
+No options. Prints table of all context entries: ID, Session, Category, Body, Created.
+
+
+## Messaging
+
+### message
+
+    claude-swarm message TO_ID BODY --from FROM_ID
+
+Arguments:
+    TO_ID   Recipient session ID
+    BODY    Message text
+
+Options:
+    --from  (required)  Sender session ID
+
+Example:
+    claude-swarm message B "Can you expose the auth types?" --from A
+
+### inbox
+
+    claude-swarm inbox --session SESSION_ID
+
+Options:
+    --session  (required)  Session ID to check inbox for
+
+Shows unread messages (table: ID, From, Body, Type, Time) and pending reviews assigned to this session. Prints "No unread messages or pending reviews" when empty.
+
+### reply
+
+    claude-swarm reply MESSAGE_ID BODY --from FROM_ID
+
+Arguments:
+    MESSAGE_ID  ID of message to reply to (integer)
+    BODY        Reply text
+
+Options:
+    --from  (required)  Sender session ID
+
+Marks the original message as read and sends reply to the original sender.
+
+
+## Initialization & Status
+
+### init
+
+    claude-swarm init --sessions "A:frontend B:backend C:infra"
+
+Options:
+    --sessions  (required)  Space-separated "ID:workstream" pairs
+
+Creates the database, registers each session with status "running" and branch "feat/{workstream}".
+
+### status
+
+    claude-swarm status
+
+No options. Prints table: ID, Workstream, Status (running/blocked/done), Branch, Note, Updated.
+
+
+## Session Updates
+
+### update
+
+    claude-swarm update SESSION_ID --status STATUS --note NOTE
+
+Arguments:
+    SESSION_ID  Session to update
+
+Options:
+    --status  New status: running, blocked, done
+    --note    Status note
+
+Example:
+    claude-swarm update A --status blocked --note "waiting on B for types"
+    claude-swarm update A --status running --note "implementing rate limiter"
+
+
+## File Claims
+
+Exclusive file ownership. Prevents two sessions from editing the same file.
+
+### claim
+
+    claude-swarm claim FILE_PATH --session SESSION_ID
+
+Arguments:
+    FILE_PATH  Path to file to claim
+
+Options:
+    --session  (required)  Session ID
+
+Exit code 0 on success. Exit code 1 if already claimed by another session.
+
+### claims
+
+    claude-swarm claims
+
+No options. Prints table: File, Session, Claimed At. Prints "No active claims" when empty.
+
+### unclaim
+
+    claude-swarm unclaim FILE_PATH --session SESSION_ID
+
+Arguments:
+    FILE_PATH  Path to file to release
+
+Options:
+    --session  (required)  Session ID
+
+
+## Peer Review
+
+### review request
+
+    claude-swarm review request --from FROM_ID --to TO_ID --diff DIFF_TEXT
+
+Options:
+    --from  (required)  Requester session ID
+    --to    (required)  Reviewer session ID
+    --diff  (required)  Diff content (typically "$(git diff main)")
+
+Creates a review (status: pending) and sends a notification message to the reviewer's inbox.
+
+### review list
+
+    claude-swarm review list
+
+No options. Prints table: ID, Requester, Reviewer, Status (pending/approved/rejected), Comments, Created.
+
+### review show
+
+    claude-swarm review show REVIEW_ID
+
+Arguments:
+    REVIEW_ID  Review ID to display (integer)
+
+Prints: Requester, Reviewer, Status, Comments, full Diff.
+
+### review approve
+
+    claude-swarm review approve REVIEW_ID --from FROM_ID --comment COMMENT
+
+Arguments:
+    REVIEW_ID  Review ID to approve (integer)
+
+Options:
+    --from     (required)  Reviewer session ID
+    --comment  (optional, default "")  Approval comment
+
+Sets status to "approved". Sends approval notification to requester.
+
+### review reject
+
+    claude-swarm review reject REVIEW_ID --from FROM_ID --comment COMMENT
+
+Arguments:
+    REVIEW_ID  Review ID to reject (integer)
+
+Options:
+    --from     (required)  Reviewer session ID
+    --comment  (optional, default "")  Rejection reason
+
+Resets status to "pending". Sends rejection notification to requester. Requester must address and re-request.
+
+### merge-ok
+
+    claude-swarm merge-ok SESSION_ID
+
+Arguments:
+    SESSION_ID  Session to check
+
+Exit code 0 if clear to merge (all reviews approved or no reviews). Exit code 1 if any pending/rejected reviews exist.
+
+
+## Git Operations
+
+### commit
+
+    claude-swarm commit DESCRIPTION --session SESSION_ID
+
+Arguments:
+    DESCRIPTION  Commit message
+
+Options:
+    --session  (required)  Session ID
+
+Commits staged changes. Message is auto-prefixed: "[Session A] add PII detection middleware"
+
+### push
+
+    claude-swarm push --session SESSION_ID
+
+Options:
+    --session  (required)  Session ID
+
+Acquires git lock (waits if held by another session), rebases on latest, pushes, releases lock. On failure: sets session status to "blocked" with note "push failed".
+
+### pull
+
+    claude-swarm pull --session SESSION_ID
+
+Options:
+    --session  (required)  Session ID
+
+Pulls and rebases on latest.
+
+### git-status
+
+    claude-swarm git-status
+
+No options. Prints git status output.
+
+### git-diff
+
+    claude-swarm git-diff --staged
+
+Options:
+    --staged  (optional, flag)  Show only staged changes
+
+### git-log
+
+    claude-swarm git-log
+
+No options. Prints recent git log.
+
+
+## Orchestrator
+
+### orchestrate run
+
+    claude-swarm orchestrate run --interval 10 --auto-approve --stale-minutes 15 --quiet
+
+Options:
+    --interval       (default 10)   Poll interval in seconds
+    --auto-approve   (flag)         Auto-approve reviews assigned to orchestrator
+    --stale-minutes  (default 15)   Minutes before a session is considered stale
+    --quiet          (flag)         Only print when there are events
+
+Runs a continuous poll loop. Detects blocked sessions, stale sessions, pending reviews, unread messages. Prints events as they occur.
+
+### orchestrate dashboard
+
+    claude-swarm orchestrate dashboard
+
+No options. One-shot status view: all sessions, inbox messages, pending reviews, active file claims.
+
+
+## Quick Start Entry Point (ao)
+
+### ao setup
+
+    ao setup
+
+Checks that Claude Code CLI is installed. Exit 0 if found, exit 1 if not.
+
+### ao start
+
+    ao start "Build a REST API with auth" --project-dir .
+
+Arguments:
+    DESCRIPTION  Project description (what to build)
+
+Options:
+    --project-dir  (default ".")  Project directory
+
+What it does:
+1. Verifies Claude Code is installed
+2. Creates .claude-swarm/ directory
+3. Writes/appends CLAUDE.md with coordination protocol
+4. Launches Claude Code with orchestrator prompt
+5. Orchestrator decomposes project into workstreams
+6. Prints copy-pasteable prompts for each session terminal
