@@ -163,6 +163,8 @@ def get_pending_reviews(reviewer: str, *, db_path: str | None = None) -> list[di
 
 def resolve_review(review_id: int, status: str, *, comments: str = "", db_path: str | None = None) -> None:
     conn = _connect(db_path)
+    # Look up the review to get requester/reviewer for notifications
+    review = conn.execute("SELECT * FROM reviews WHERE id = ?", (review_id,)).fetchone()
     if status == "rejected":
         # Rejection resets to pending — requester must address and re-request
         conn.execute(
@@ -176,6 +178,24 @@ def resolve_review(review_id: int, status: str, *, comments: str = "", db_path: 
         )
     conn.commit()
     conn.close()
+    # Notify the requester about the resolution
+    if review:
+        reviewer = review["reviewer"]
+        requester = review["requester"]
+        if status == "approved":
+            send_message(
+                reviewer, requester,
+                f"Review #{review_id} approved by {reviewer}: '{comments}' — you're clear to merge-ok and push",
+                type="review_approved",
+                db_path=db_path,
+            )
+        elif status == "rejected":
+            send_message(
+                reviewer, requester,
+                f"Review #{review_id} rejected by {reviewer}: '{comments}' — address comments and re-request",
+                type="review_rejected",
+                db_path=db_path,
+            )
 
 
 def can_merge(session_id: str, *, db_path: str | None = None) -> bool:

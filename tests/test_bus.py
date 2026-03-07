@@ -112,6 +112,31 @@ class TestReviews:
         assert "Review #" in inbox[0]["body"]
         assert inbox[0]["type"] == "review_request"
 
+    def test_approve_notifies_requester(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        review_id = create_review("A", "B", "diff content", db_path=db_path)
+        # Clear B's inbox (the review_request notification)
+        for msg in get_inbox("B", db_path=db_path):
+            mark_read(msg["id"], db_path=db_path)
+        resolve_review(review_id, "approved", comments="lgtm", db_path=db_path)
+        inbox = get_inbox("A", db_path=db_path)
+        assert len(inbox) == 1
+        assert "approved" in inbox[0]["body"]
+        assert "merge-ok" in inbox[0]["body"]
+        assert inbox[0]["type"] == "review_approved"
+
+    def test_reject_notifies_requester(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        review_id = create_review("A", "B", "diff content", db_path=db_path)
+        resolve_review(review_id, "rejected", comments="fix types", db_path=db_path)
+        inbox = get_inbox("A", db_path=db_path)
+        assert len(inbox) == 1
+        assert "rejected" in inbox[0]["body"]
+        assert "fix types" in inbox[0]["body"]
+        assert inbox[0]["type"] == "review_rejected"
+
 
 class TestFileClaims:
     def test_claim_prevents_double_claim(self, db_path):
