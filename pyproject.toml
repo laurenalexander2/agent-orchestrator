@@ -1,16 +1,38 @@
 [project]
 name = "agent-orchestrator"
-version = "0.1.0"
+version = "0.2.0"
+description = "CLI for parallel Claude Code sessions to coordinate via message bus, file claims, peer review gates, and git lock management"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.11"
+authors = [
+    {name = "Lauren Alexander"},
+]
+keywords = ["claude", "claude-code", "agent", "orchestrator", "multi-agent", "coordination"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+]
 dependencies = [
     "click>=8.0",
     "rich>=13.0",
-    "gitpython>=3.1",
-    "anthropic>=0.40",
 ]
+
+[project.urls]
+Homepage = "https://github.com/laurenalexander2/agent-orchestrator"
+Repository = "https://github.com/laurenalexander2/agent-orchestrator"
+Issues = "https://github.com/laurenalexander2/agent-orchestrator/issues"
 
 [project.scripts]
 agent-orchestrator = "agent_orchestrator.cli:main"
+ao = "agent_orchestrator.ao:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
