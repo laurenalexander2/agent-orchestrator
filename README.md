@@ -1,4 +1,7 @@
-# agent-orchestrator
+# agent-orchestrator 
+
+MIT License
+Copyright (c) 2026 Lauren Alexander
 
 A local CLI for parallel Claude Code sessions to coordinate with each other. Sessions can message, claim files, request peer reviews, and safely push through a shared git lock — all backed by a lightweight SQLite bus.
 
