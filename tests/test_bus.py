@@ -103,6 +103,15 @@ class TestReviews:
         register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
         assert can_merge("A", db_path=db_path)
 
+    def test_create_review_notifies_reviewer(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        review_id = create_review("A", "B", "diff content", db_path=db_path)
+        inbox = get_inbox("B", db_path=db_path)
+        assert len(inbox) == 1
+        assert "Review #" in inbox[0]["body"]
+        assert inbox[0]["type"] == "review_request"
+
 
 class TestFileClaims:
     def test_claim_prevents_double_claim(self, db_path):

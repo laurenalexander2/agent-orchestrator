@@ -141,6 +141,13 @@ def create_review(requester: str, reviewer: str, diff: str, *, db_path: str | No
     conn.commit()
     review_id = cur.lastrowid
     conn.close()
+    # Notify the reviewer via a message so it shows up in their inbox
+    send_message(
+        requester, reviewer,
+        f"Review #{review_id} requested — run 'agent-orchestrator review show {review_id}' to see diff",
+        type="review_request",
+        db_path=db_path,
+    )
     return review_id
 
 

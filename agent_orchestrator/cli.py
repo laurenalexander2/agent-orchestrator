@@ -96,9 +96,21 @@ def message(ctx, to_id, body, from_id):
 @click.pass_context
 def inbox(ctx, session):
     """Check unread messages for a session."""
-    messages = bus.get_inbox(session, db_path=_db(ctx))
+    db_path = _db(ctx)
+    messages = bus.get_inbox(session, db_path=db_path)
+    pending_reviews = bus.get_pending_reviews(session, db_path=db_path)
+
+    if pending_reviews:
+        console.print(f"[bold yellow]You have {len(pending_reviews)} pending review(s) to action[/bold yellow]")
+        for r in pending_reviews:
+            console.print(f"  Review #{r['id']} from {r['requester']} — run: agent-orchestrator review show {r['id']}")
+        console.print()
+
+    if not messages and not pending_reviews:
+        console.print("[dim]No unread messages or pending reviews[/dim]")
+        return
+
     if not messages:
-        console.print("[dim]No unread messages[/dim]")
         return
 
     table = Table(title=f"Inbox for {session}")
