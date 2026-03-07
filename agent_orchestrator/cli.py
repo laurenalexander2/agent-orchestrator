@@ -8,6 +8,7 @@ from rich.table import Table
 
 from agent_orchestrator import bus
 from agent_orchestrator import git as agent_git
+from agent_orchestrator import orchestrator
 
 console = Console()
 
@@ -376,6 +377,50 @@ def git_diff(ctx, staged):
 def git_log(ctx):
     """Show recent git log."""
     console.print(agent_git.log())
+
+
+# --- Orchestrate ---
+
+@main.group()
+@click.pass_context
+def orchestrate(ctx):
+    """Orchestrator mode — monitor and coordinate sessions."""
+    pass
+
+
+@orchestrate.command()
+@click.option("--interval", default=10, type=int, help="Poll interval in seconds")
+@click.option("--auto-approve", is_flag=True, help="Auto-approve reviews assigned to orchestrator")
+@click.option("--stale-minutes", default=15, type=int, help="Minutes before a session is considered stale")
+@click.option("--quiet", is_flag=True, help="Only print when there are events")
+@click.pass_context
+def run(ctx, interval, auto_approve, stale_minutes, quiet):
+    """Start the orchestrator poll loop."""
+    orchestrator.run_loop(
+        interval=interval,
+        auto_approve=auto_approve,
+        stale_minutes=stale_minutes,
+        quiet=quiet,
+        db_path=_db(ctx.parent),
+    )
+
+
+@orchestrate.command()
+@click.pass_context
+def dashboard(ctx):
+    """One-shot status dashboard (sessions + inbox + reviews + claims)."""
+    result = orchestrator.poll_tick(db_path=_db(ctx.parent))
+    orchestrator.render_tick(result, quiet=False)
+
+    # Also show file claims
+    claims = bus.get_claims(db_path=_db(ctx.parent))
+    if claims:
+        table = Table(title="File Claims")
+        table.add_column("File")
+        table.add_column("Session")
+        for c in claims:
+            table.add_row(c["file_path"], c["session_id"])
+        console.print(table)
 
 
 if __name__ == "__main__":

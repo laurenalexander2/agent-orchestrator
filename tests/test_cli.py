@@ -150,3 +150,28 @@ class TestSessionUpdate:
 
         result = runner.invoke(main, [*_db(db_path), "status"])
         assert "blocked" in result.output
+
+
+class TestOrchestrateDashboard:
+    def test_dashboard_shows_sessions(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "orchestrator:orchestrator A:python-sdk B:ts-sdk"])
+        result = runner.invoke(main, [*_db(db_path), "orchestrate", "dashboard"])
+        assert result.exit_code == 0
+        assert "all clear" in result.output or "Orchestrator" in result.output
+
+    def test_dashboard_shows_blocked(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "orchestrator:orchestrator A:python-sdk"])
+        runner.invoke(main, [*_db(db_path), "update", "A", "--status", "blocked", "--note", "waiting"])
+        result = runner.invoke(main, [*_db(db_path), "orchestrate", "dashboard"])
+        assert result.exit_code == 0
+        assert "ALERT" in result.output or "blocked" in result.output
+
+    def test_dashboard_shows_inbox(self, cli_env):
+        runner, db_path = cli_env
+        runner.invoke(main, [*_db(db_path), "init", "--sessions", "orchestrator:orchestrator A:python-sdk"])
+        runner.invoke(main, [*_db(db_path), "message", "orchestrator", "hello", "--from", "A"])
+        result = runner.invoke(main, [*_db(db_path), "orchestrate", "dashboard"])
+        assert result.exit_code == 0
+        assert "hello" in result.output

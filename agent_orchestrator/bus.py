@@ -161,6 +161,29 @@ def get_pending_reviews(reviewer: str, *, db_path: str | None = None) -> list[di
     return [dict(r) for r in rows]
 
 
+def get_all_pending_reviews(*, db_path: str | None = None) -> list[dict]:
+    conn = _connect(db_path)
+    rows = conn.execute(
+        "SELECT * FROM reviews WHERE status = 'pending' ORDER BY created_at"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_all_messages(*, unread_only: bool = True, db_path: str | None = None) -> list[dict]:
+    conn = _connect(db_path)
+    if unread_only:
+        rows = conn.execute(
+            "SELECT * FROM messages WHERE status = 'unread' ORDER BY created_at"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM messages ORDER BY created_at"
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def resolve_review(review_id: int, status: str, *, comments: str = "", db_path: str | None = None) -> None:
     conn = _connect(db_path)
     # Look up the review to get requester/reviewer for notifications

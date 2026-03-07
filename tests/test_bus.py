@@ -11,6 +11,8 @@ from agent_orchestrator.bus import (
     mark_read,
     create_review,
     get_pending_reviews,
+    get_all_pending_reviews,
+    get_all_messages,
     resolve_review,
     can_merge,
     claim_file,
@@ -173,3 +175,49 @@ class TestFileClaims:
         register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
         assert claim_file("A", "src/client.py", db_path=db_path) is True
         assert claim_file("A", "src/client.py", db_path=db_path) is True
+
+
+class TestGetAllPendingReviews:
+    def test_returns_all_pending_across_reviewers(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        register_session("C", "website", "feat/website", db_path=db_path)
+        create_review("A", "B", "diff1", db_path=db_path)
+        create_review("A", "C", "diff2", db_path=db_path)
+        pending = get_all_pending_reviews(db_path=db_path)
+        assert len(pending) == 2
+        reviewers = {r["reviewer"] for r in pending}
+        assert reviewers == {"B", "C"}
+
+    def test_excludes_approved_reviews(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        review_id = create_review("A", "B", "diff", db_path=db_path)
+        resolve_review(review_id, "approved", comments="lgtm", db_path=db_path)
+        pending = get_all_pending_reviews(db_path=db_path)
+        assert len(pending) == 0
+
+
+class TestGetAllMessages:
+    def test_returns_all_unread(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        send_message("A", "B", "msg1", db_path=db_path)
+        send_message("B", "A", "msg2", db_path=db_path)
+        msgs = get_all_messages(db_path=db_path)
+        assert len(msgs) >= 2
+        bodies = {m["body"] for m in msgs}
+        assert "msg1" in bodies
+        assert "msg2" in bodies
+
+    def test_includes_read_when_unread_only_false(self, db_path):
+        register_session("A", "python-sdk", "feat/python-sdk", db_path=db_path)
+        register_session("B", "ts-sdk", "feat/ts-sdk", db_path=db_path)
+        msg_id = send_message("A", "B", "msg1", db_path=db_path)
+        mark_read(msg_id, db_path=db_path)
+        # unread_only=True should exclude it
+        unread = get_all_messages(unread_only=True, db_path=db_path)
+        assert all(m["body"] != "msg1" for m in unread)
+        # unread_only=False should include it
+        all_msgs = get_all_messages(unread_only=False, db_path=db_path)
+        assert any(m["body"] == "msg1" for m in all_msgs)
