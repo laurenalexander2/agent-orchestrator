@@ -20,11 +20,18 @@ Requires Python 3.11+.
 
 This writes a CLAUDE.md, creates .claude-swarm/, launches Claude Code as orchestrator. The orchestrator decomposes the project into workstreams and prints copy-pasteable prompts for each session.
 
-## Documentation
+## Documentation (plain text, for LLMs)
 
 - llms-full.txt  — Complete reference (every command, every schema table, workflow)
 - commands.txt   — CLI command reference only
 - schema.txt     — Database schema only
+
+## Website (HTML, for humans)
+
+- index.html          — Landing page
+- docs.html           — Getting started + full CLI reference
+- architecture.html   — System design + database schema
+- contributing.html   — How to contribute
 
 ## Source
 

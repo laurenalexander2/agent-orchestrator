@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contributing — claude-swarm</title>
+<meta name="description" content="How to contribute to claude-swarm: development setup, TDD workflow, guidelines, and roadmap.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a href="index.html" class="logo">claude-swarm</a>
+  <a href="index.html">Home</a>
+  <a href="docs.html">Docs</a>
+  <a href="architecture.html">Architecture</a>
+  <a href="contributing.html" class="active">Contributing</a>
+  <span class="spacer"></span>
+  <a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a>
+</nav>
+
+<main>
+  <h1>Contributing</h1>
+
+  <h2>Development Setup</h2>
+  <pre>
+git clone https://github.com/laurenalexander2/claude-swarm.git
+cd claude-swarm
+pip install -e .
+pytest tests/ -v</pre>
+  <p>Requires Python 3.11+. No external databases or services needed &mdash; everything runs on SQLite.</p>
+
+  <h2>Development Workflow</h2>
+  <ol>
+    <li>Fork the repo and create a feature branch</li>
+    <li>Write tests first (TDD) &mdash; add them to the appropriate <code>tests/test_*.py</code> file</li>
+    <li>Implement the feature</li>
+    <li>Run <code>pytest tests/ -v</code> and make sure all tests pass</li>
+    <li>Open a PR</li>
+  </ol>
+
+  <h2>Code Structure</h2>
+  <p>If you're adding a new feature, it probably belongs in <code>bus.py</code> (data) or a new module (logic), with a CLI surface in <code>cli.py</code>.</p>
+  <table>
+    <thead>
+      <tr><th>Module</th><th>Responsibility</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>bus.py</code></td><td>All SQLite reads/writes &mdash; sessions, messages, reviews, file claims, shared context, sync</td></tr>
+      <tr><td><code>git.py</code></td><td>Git operations + push lock management</td></tr>
+      <tr><td><code>merge.py</code></td><td>Conflict self-healing + file owner notifications</td></tr>
+      <tr><td><code>orchestrator.py</code></td><td>Poll loop, blocked/stale detection, auto-approve</td></tr>
+      <tr><td><code>cli.py</code></td><td>Click CLI commands (thin layer over the other modules)</td></tr>
+      <tr><td><code>ao.py</code></td><td>Quick-start entry point (<code>ao setup</code>, <code>ao start</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Guidelines</h2>
+  <ul>
+    <li><strong>Keep it simple.</strong> This is a coordination tool, not a framework.</li>
+    <li><strong>Every feature needs tests.</strong> No exceptions. The project currently has 90 tests.</li>
+    <li><strong>CLI commands should be self-documenting.</strong> Use <code>--help</code> text and clear naming.</li>
+    <li><strong>SQLite is the only dependency for state.</strong> No external databases, no Redis, no message queues.</li>
+  </ul>
+
+  <h2>Testing</h2>
+  <pre>pytest tests/ -v</pre>
+  <p>90 tests covering:</p>
+  <ul>
+    <li>Shared context CRUD and category validation</li>
+    <li>Sync (inbox + context + heartbeat in one call)</li>
+    <li>Message exchange and inbox filtering</li>
+    <li>Review gating (blocks merge until approved, rejection resets to pending)</li>
+    <li>Review notifications (reviewer gets request, requester gets approval/rejection)</li>
+    <li>File claim conflicts and release semantics</li>
+    <li>Git lock acquire/release and concurrent push safety</li>
+    <li>Commit message prefixing with session ID</li>
+    <li>Conflict self-healing for non-overlapping changes</li>
+    <li>Orchestrator poll loop (blocked/stale detection, auto-approve)</li>
+    <li>CLI integration flows</li>
+    <li>Template generation (CLAUDE.md, session prompts, orchestrator prompt)</li>
+  </ul>
+
+  <h2>Roadmap</h2>
+  <p>High-impact contributions for v2:</p>
+  <ul>
+    <li><strong>Claude Code hooks integration</strong> &mdash; automatic sync via PreToolUse hooks, making coordination fully transparent to the agent</li>
+    <li><strong>Task queue</strong> &mdash; shared backlog that sessions pull from instead of fixed assignments</li>
+    <li><strong>Session dependencies</strong> &mdash; DAG of task dependencies so the orchestrator can sequence work</li>
+    <li><strong>Deadlock detection</strong> &mdash; identify circular blocking between sessions</li>
+    <li><strong>Per-session branches</strong> &mdash; each session works on its own branch with PR workflow</li>
+    <li><strong>Dynamic scaling</strong> &mdash; add/remove sessions while the swarm is running</li>
+  </ul>
+
+  <h2>Reporting Issues</h2>
+  <p>Open an issue at <a href="https://github.com/laurenalexander2/claude-swarm/issues">github.com/laurenalexander2/claude-swarm/issues</a> with:</p>
+  <ul>
+    <li>What you expected to happen</li>
+    <li>What actually happened</li>
+    <li>Steps to reproduce</li>
+    <li>Output of <code>claude-swarm status</code> if relevant</li>
+  </ul>
+</main>
+
+<footer>
+  MIT License &middot; <a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a> &middot; <a href="https://pypi.org/project/claude-swarm/">PyPI</a>
+</footer>
+</body>
+</html>
