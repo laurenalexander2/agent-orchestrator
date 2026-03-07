@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.agent-orchestrator/
+.pytest_cache/
