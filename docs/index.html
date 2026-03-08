@@ -3,79 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>claude-swarm — Coordinate parallel Claude Code sessions</title>
-<meta name="description" content="CLI tool for parallel Claude Code sessions to coordinate via shared context, messaging, file claims, peer reviews, and a serialized git lock. All backed by SQLite.">
-<link rel="stylesheet" href="style.css">
+<title>claude-swarm</title>
 </head>
 <body>
-<nav>
-  <a href="index.html" class="logo">claude-swarm</a>
-  <a href="index.html" class="active">Home</a>
-  <a href="docs.html">Docs</a>
-  <a href="architecture.html">Architecture</a>
-  <a href="contributing.html">Contributing</a>
-  <span class="spacer"></span>
-  <a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a>
-</nav>
+<p><strong>claude-swarm</strong> &middot; <a href="index.html">Home</a> &middot; <a href="docs.html">Docs</a> &middot; <a href="architecture.html">Architecture</a> &middot; <a href="contributing.html">Contributing</a> &middot; <a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a></p>
+<hr>
 
-<main>
-  <div class="hero">
-    <h1>claude-swarm</h1>
-    <p class="tagline">Coordinate parallel Claude Code sessions. Shared context, messaging, file claims, peer reviews, and a serialized git lock &mdash; all backed by a single SQLite database.</p>
-    <pre>pip install claude-swarm</pre>
-    <br>
-    <pre>brew tap laurenalexander2/tap &amp;&amp; brew install claude-swarm</pre>
-  </div>
+<h1>claude-swarm</h1>
+<p>A CLI for coordinating multiple Claude Code sessions working on the same codebase. All state is stored in a single SQLite database.</p>
 
-  <h2>The Problem</h2>
-  <p>When you run multiple Claude Code sessions on the same codebase, things break fast:</p>
-  <ul>
-    <li><strong>Sessions overwrite each other's files</strong> &mdash; two agents editing the same file at the same time leads to lost work</li>
-    <li><strong>Decisions don't propagate</strong> &mdash; one session picks JWT for auth, another picks session cookies, and they only find out when things break</li>
-    <li><strong>No communication channel</strong> &mdash; sessions can't ask each other questions, report blockers, or request help</li>
-    <li><strong>No quality gate</strong> &mdash; code gets pushed without anyone reviewing it, including the other sessions that depend on it</li>
-    <li><strong>Git pushes collide</strong> &mdash; concurrent rebases and pushes produce conflicts that waste time to untangle</li>
-  </ul>
+<pre>pip install claude-swarm</pre>
+<pre>brew tap laurenalexander2/tap &amp;&amp; brew install claude-swarm</pre>
+<p>Requires Python 3.11+.</p>
 
-  <h2>How claude-swarm Solves It</h2>
-  <div class="features">
-    <div class="feature">
-      <h3>Shared Context</h3>
-      <p>A team wiki all sessions read and write. Share decisions, interfaces, warnings, and conventions. Everyone stays aligned.</p>
-    </div>
-    <div class="feature">
-      <h3>Messaging</h3>
-      <p>Session-to-session messages with inbox tracking. Ask questions, share status updates, report blockers. The sync command checks everything in one call.</p>
-    </div>
-    <div class="feature">
-      <h3>File Claims</h3>
-      <p>Claim files before editing. Exclusive ownership prevents two sessions from touching the same file. Release when done.</p>
-    </div>
-    <div class="feature">
-      <h3>Peer Review</h3>
-      <p>Request reviews, approve or reject, and gate merges behind peer approval. No code ships without someone checking it.</p>
-    </div>
-    <div class="feature">
-      <h3>Git Lock</h3>
-      <p>Serialize pushes through a single lock. Acquire, rebase, push, release. No more concurrent push collisions.</p>
-    </div>
-    <div class="feature">
-      <h3>Orchestrator Mode</h3>
-      <p>A central monitor that watches all sessions, detects blocked and stale agents, handles reviews, and keeps the swarm moving.</p>
-    </div>
-  </div>
+<h2>What It Does</h2>
+<p>When multiple Claude Code sessions work on the same repo, they need a way to coordinate. claude-swarm provides:</p>
+<ul>
+  <li><strong>Shared context</strong> &mdash; a team wiki where sessions share decisions, interfaces, warnings, and conventions</li>
+  <li><strong>Sync</strong> &mdash; one command that checks inbox, reads new context, and sends a heartbeat</li>
+  <li><strong>Messaging</strong> &mdash; session-to-session messages with read/unread tracking</li>
+  <li><strong>File claims</strong> &mdash; exclusive file ownership so two sessions don't edit the same file</li>
+  <li><strong>Peer review</strong> &mdash; review requests, approval/rejection, merge gating</li>
+  <li><strong>Git lock</strong> &mdash; serialized pushes so concurrent rebases don't collide</li>
+  <li><strong>Orchestrator</strong> &mdash; a monitor that detects blocked/stale sessions and keeps things moving</li>
+</ul>
 
-  <h2>Quick Start</h2>
-  <pre>
-# Check that Claude Code is installed
-ao setup
+<h2>Quick Start</h2>
+<pre>ao setup                              # check Claude Code is installed
+ao start "Build a REST API with auth"  # launch orchestrator mode</pre>
+<p>This creates a <code>.claude-swarm/</code> directory, writes a <code>CLAUDE.md</code> with the coordination protocol, and launches Claude Code as orchestrator. The orchestrator splits the project into workstreams and prints a prompt for each session. You paste each prompt into a separate Claude Code terminal.</p>
 
-# Launch orchestrator mode with your project description
-ao start "Build a REST API with auth and rate limiting"</pre>
-  <p>This writes a <code>CLAUDE.md</code> with the full coordination protocol, creates the <code>.claude-swarm/</code> directory, and launches Claude Code as the orchestrator. The orchestrator decomposes your project into workstreams and prints copy-pasteable prompts &mdash; one for each session. Paste each into a separate Claude Code terminal and they coordinate automatically.</p>
+<p>Or set up manually:</p>
+<pre>claude-swarm init --sessions "A:frontend B:backend C:infra"
+claude-swarm status</pre>
 
-  <h2>How It Works</h2>
-  <pre>
+<h2>How It Works</h2>
+<pre>
 ao start "Build X"
      |
      v
@@ -100,16 +63,22 @@ Session A    Session B      (each in its own terminal)
      +-- review  +-- review   (peer approval)
      +-- push    +-- push     (lock-serialized)</pre>
 
-  <div class="cta">
-    <p>Ready to coordinate your Claude Code sessions?</p>
-    <a href="docs.html">Read the Docs</a>
-    <a href="https://github.com/laurenalexander2/claude-swarm">View on GitHub</a>
-    <a href="https://pypi.org/project/claude-swarm/">PyPI</a>
-  </div>
-</main>
+<h2>Pages</h2>
+<ul>
+  <li><a href="docs.html">Docs</a> &mdash; install, workflow, full CLI reference</li>
+  <li><a href="architecture.html">Architecture</a> &mdash; module map, database schema, design decisions</li>
+  <li><a href="contributing.html">Contributing</a> &mdash; dev setup, guidelines, roadmap</li>
+</ul>
 
-<footer>
-  MIT License &middot; <a href="llms.txt">llms.txt</a> &middot; <a href="llms-full.txt">llms-full.txt</a>
-</footer>
+<h2>For LLMs</h2>
+<ul>
+  <li><a href="llms.txt">llms.txt</a> &mdash; summary and links</li>
+  <li><a href="llms-full.txt">llms-full.txt</a> &mdash; complete reference in one file</li>
+  <li><a href="commands.txt">commands.txt</a> &mdash; CLI reference only</li>
+  <li><a href="schema.txt">schema.txt</a> &mdash; database schema only</li>
+</ul>
+
+<hr>
+<p><a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a> &middot; <a href="https://pypi.org/project/claude-swarm/">PyPI</a> &middot; MIT License</p>
 </body>
 </html>

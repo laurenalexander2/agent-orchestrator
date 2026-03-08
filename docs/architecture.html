@@ -4,25 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Architecture — claude-swarm</title>
-<meta name="description" content="How claude-swarm works: module map, database schema, and design decisions.">
-<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<nav>
-  <a href="index.html" class="logo">claude-swarm</a>
-  <a href="index.html">Home</a>
-  <a href="docs.html">Docs</a>
-  <a href="architecture.html" class="active">Architecture</a>
-  <a href="contributing.html">Contributing</a>
-  <span class="spacer"></span>
-  <a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a>
-</nav>
+<p><strong>claude-swarm</strong> &middot; <a href="index.html">Home</a> &middot; <a href="docs.html">Docs</a> &middot; <a href="architecture.html">Architecture</a> &middot; <a href="contributing.html">Contributing</a> &middot; <a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a></p>
+<hr>
 
-<main>
-  <h1>Architecture</h1>
+<h1>Architecture</h1>
 
-  <h2>System Overview</h2>
-  <pre>
+<h2>System Overview</h2>
+<pre>
 ao start "Build X"
      |
      v
@@ -46,10 +36,10 @@ Session A    Session B      (each in its own terminal)
      +-- commit  +-- commit   (session-prefixed)
      +-- review  +-- review   (peer approval)
      +-- push    +-- push     (lock-serialized)</pre>
-  <p>Every session is a separate Claude Code terminal running independently. The only shared state is the SQLite database at <code>.claude-swarm/bus.db</code>. Sessions coordinate by reading and writing to this database through the CLI.</p>
+<p>Every session is a separate Claude Code terminal. The only shared state is the SQLite database at <code>.claude-swarm/bus.db</code>. Sessions coordinate by reading and writing to this database through the CLI.</p>
 
-  <h2>Modules</h2>
-  <pre>
+<h2>Modules</h2>
+<pre>
 claude_swarm/
 +-- bus.py            # SQLite message bus
 +-- git.py            # Git operations + push lock
@@ -58,35 +48,30 @@ claude_swarm/
 +-- cli.py            # Click CLI commands
 +-- ao.py             # Quick-start entry point</pre>
 
-  <table>
-    <thead>
-      <tr><th>Module</th><th>Responsibility</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><code>bus.py</code></td><td>All SQLite reads/writes &mdash; sessions, messages, reviews, file claims, shared context, sync. The data layer.</td></tr>
-      <tr><td><code>git.py</code></td><td>Git operations (add, commit, push, pull, status, diff, log) plus push lock management (acquire, release, check holder).</td></tr>
-      <tr><td><code>merge.py</code></td><td>Conflict self-healing for non-overlapping changes. Notifies file owners when their claimed files are touched.</td></tr>
-      <tr><td><code>orchestrator.py</code></td><td>Poll loop that monitors all sessions. Detects blocked and stale sessions, pending reviews, unread messages. Can auto-approve orchestrator-assigned reviews.</td></tr>
-      <tr><td><code>cli.py</code></td><td>Thin Click CLI layer over the other modules. All commands delegate to bus.py, git.py, or orchestrator.py.</td></tr>
-      <tr><td><code>ao.py</code></td><td>Quick-start entry point. <code>ao setup</code> checks prerequisites, <code>ao start</code> generates templates and launches Claude Code.</td></tr>
-    </tbody>
-  </table>
+<table>
+  <tr><th>Module</th><th>Responsibility</th></tr>
+  <tr><td><code>bus.py</code></td><td>All SQLite reads/writes &mdash; sessions, messages, reviews, file claims, shared context, sync</td></tr>
+  <tr><td><code>git.py</code></td><td>Git operations (add, commit, push, pull, status, diff, log) + push lock management</td></tr>
+  <tr><td><code>merge.py</code></td><td>Conflict self-healing for non-overlapping changes. Notifies file owners when their claimed files are touched.</td></tr>
+  <tr><td><code>orchestrator.py</code></td><td>Poll loop that monitors all sessions. Detects blocked/stale sessions, pending reviews, unread messages. Auto-approve for orchestrator-assigned reviews.</td></tr>
+  <tr><td><code>cli.py</code></td><td>Thin Click CLI layer. All commands delegate to bus.py, git.py, or orchestrator.py.</td></tr>
+  <tr><td><code>ao.py</code></td><td>Quick-start entry point. <code>ao setup</code> checks prerequisites, <code>ao start</code> generates templates and launches Claude Code.</td></tr>
+</table>
 
-  <h2>Design Decisions</h2>
-  <ul>
-    <li><strong>SQLite is the only state store.</strong> No Redis, no message queues, no external services. A single file (<code>.claude-swarm/bus.db</code>) with WAL mode handles all concurrency. This keeps the tool portable and zero-config.</li>
-    <li><strong>Copy-paste prompts, not sub-agents.</strong> The orchestrator prints prompts that you paste into separate Claude Code terminals. Each session is a real, full Claude Code instance &mdash; not a constrained sub-agent spawned via the Task tool. This gives each session full autonomy and access to all Claude Code capabilities.</li>
-    <li><strong>Sync is the core primitive.</strong> One command (<code>sync</code>) does inbox + context + heartbeat. Sessions run it between every task. This replaces manual inbox checking and ensures no session falls out of date.</li>
-    <li><strong>File claims are advisory.</strong> The CLI enforces claims, but there's nothing stopping a session from editing a file it hasn't claimed. The system trusts well-behaved agents and uses claims as a coordination signal, not a hard lock.</li>
-    <li><strong>Reviews gate merges, not commits.</strong> Sessions can commit freely. The review gate only blocks <code>merge-ok</code>, which is checked before pushing. This lets sessions work fast and only pause for quality checks at the merge boundary.</li>
-  </ul>
+<h2>Design Decisions</h2>
+<ul>
+  <li><strong>SQLite is the only state store.</strong> No Redis, no message queues, no external services. One file with WAL mode handles all concurrency.</li>
+  <li><strong>Copy-paste prompts, not sub-agents.</strong> The orchestrator prints prompts you paste into separate terminals. Each session is a full Claude Code instance with full autonomy, not a constrained sub-agent.</li>
+  <li><strong>Sync is the core primitive.</strong> One command does inbox + context + heartbeat. Sessions run it between every task.</li>
+  <li><strong>File claims are advisory.</strong> The CLI enforces claims, but nothing stops a session from editing a file it hasn't claimed. Claims are a coordination signal, not a hard lock.</li>
+  <li><strong>Reviews gate merges, not commits.</strong> Sessions commit freely. The review gate only blocks <code>merge-ok</code>, which is checked before pushing.</li>
+</ul>
 
-  <h2>Database Schema</h2>
-  <p>6 tables in <code>.claude-swarm/bus.db</code>. SQLite with WAL journal mode and foreign keys enabled.</p>
+<h2>Database Schema</h2>
+<p>6 tables in <code>.claude-swarm/bus.db</code>. SQLite with WAL journal mode and foreign keys enabled.</p>
 
-  <h3 id="sessions">sessions</h3>
-  <p>Registered sessions with status, workstream, and sync tracking.</p>
-  <pre>
+<h3 id="sessions">sessions</h3>
+<pre>
 CREATE TABLE sessions (
     id          TEXT PRIMARY KEY,
     workstream  TEXT NOT NULL,
@@ -96,19 +81,13 @@ CREATE TABLE sessions (
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_sync_at DATETIME
 );</pre>
-  <dl>
-    <dt><code>id</code></dt><dd>Session identifier (e.g. "A", "B", "orchestrator")</dd>
-    <dt><code>workstream</code></dt><dd>Description (e.g. "frontend", "backend")</dd>
-    <dt><code>status</code></dt><dd>"running", "blocked", or "done"</dd>
-    <dt><code>branch</code></dt><dd>Feature branch name (e.g. "feat/frontend")</dd>
-    <dt><code>note</code></dt><dd>Status message or blocker reason</dd>
-    <dt><code>updated_at</code></dt><dd>Last heartbeat or status update (UTC)</dd>
-    <dt><code>last_sync_at</code></dt><dd>Last sync timestamp. Context entries after this are returned on next sync. NULL means first sync returns all context.</dd>
-  </dl>
+<p><code>id</code> &mdash; e.g. "A", "B", "orchestrator"<br>
+<code>status</code> &mdash; "running", "blocked", "done"<br>
+<code>updated_at</code> &mdash; refreshed on every sync and status update<br>
+<code>last_sync_at</code> &mdash; context entries after this timestamp are returned on next sync. NULL means first sync returns all context.</p>
 
-  <h3 id="messages">messages</h3>
-  <p>Inter-session messages with read/unread tracking.</p>
-  <pre>
+<h3 id="messages">messages</h3>
+<pre>
 CREATE TABLE messages (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     from_id     TEXT NOT NULL,
@@ -118,14 +97,11 @@ CREATE TABLE messages (
     status      TEXT DEFAULT 'unread',
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );</pre>
-  <dl>
-    <dt><code>type</code></dt><dd>"message", "review_request", "review_approved", or "review_rejected"</dd>
-    <dt><code>status</code></dt><dd>"unread" or "read". Sync marks all unread messages as read.</dd>
-  </dl>
+<p><code>type</code> &mdash; "message", "review_request", "review_approved", "review_rejected"<br>
+<code>status</code> &mdash; "unread" or "read". Sync marks all unread as read.</p>
 
-  <h3 id="reviews">reviews</h3>
-  <p>Peer review requests with approval/rejection flow.</p>
-  <pre>
+<h3 id="reviews">reviews</h3>
+<pre>
 CREATE TABLE reviews (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     requester   TEXT NOT NULL,
@@ -135,34 +111,29 @@ CREATE TABLE reviews (
     comments    TEXT,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );</pre>
-  <dl>
-    <dt><code>status</code></dt><dd>"pending" or "approved". Rejection resets to "pending" &mdash; the requester must address comments and re-request.</dd>
-  </dl>
-  <p><code>merge-ok</code> returns true only when zero reviews have status != "approved" for the given session.</p>
+<p><code>status</code> &mdash; "pending" or "approved". Rejection resets to "pending".<br>
+<code>merge-ok</code> returns true only when zero reviews have status != "approved".</p>
 
-  <h3 id="git_lock">git_lock</h3>
-  <p>Single-row lock for serializing git pushes.</p>
-  <pre>
+<h3 id="git_lock">git_lock</h3>
+<pre>
 CREATE TABLE git_lock (
     id          INTEGER PRIMARY KEY CHECK (id = 1),
     held_by     TEXT,
     acquired_at DATETIME
 );</pre>
-  <p>Only one row ever exists. <code>held_by</code> is the session ID holding the lock, or NULL. Push acquires the lock, rebases, pushes, then releases. Other sessions wait until the lock is free.</p>
+<p>Single-row table. <code>held_by</code> is session ID or NULL. Push acquires, rebases, pushes, releases. Others wait.</p>
 
-  <h3 id="file_claims">file_claims</h3>
-  <p>Exclusive file ownership per session.</p>
-  <pre>
+<h3 id="file_claims">file_claims</h3>
+<pre>
 CREATE TABLE file_claims (
     file_path   TEXT PRIMARY KEY,
     session_id  TEXT NOT NULL,
     claimed_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );</pre>
-  <p>One owner per file. Claiming fails if a different session already holds the claim. Same session can re-claim (updates timestamp).</p>
+<p>One owner per file. Claiming fails if a different session holds it. Same session can re-claim.</p>
 
-  <h3 id="shared_context">shared_context</h3>
-  <p>Team-wide decisions, interfaces, warnings, conventions, discoveries.</p>
-  <pre>
+<h3 id="shared_context">shared_context</h3>
+<pre>
 CREATE TABLE shared_context (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id  TEXT NOT NULL,
@@ -170,14 +141,10 @@ CREATE TABLE shared_context (
     body        TEXT NOT NULL,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );</pre>
-  <dl>
-    <dt><code>category</code></dt><dd>"decision", "interface", "warning", "convention", or "discovery"</dd>
-  </dl>
-  <p>Timestamps use Python microsecond precision (not SQLite's second-level <code>CURRENT_TIMESTAMP</code>) to ensure sync filtering works correctly.</p>
-</main>
+<p><code>category</code> &mdash; "decision", "interface", "warning", "convention", "discovery"<br>
+Timestamps use Python microsecond precision for sync filtering.</p>
 
-<footer>
-  MIT License &middot; <a href="llms.txt">llms.txt</a> &middot; <a href="schema.txt">schema.txt</a>
-</footer>
+<hr>
+<p><a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a> &middot; <a href="schema.txt">schema.txt</a> &middot; MIT License</p>
 </body>
 </html>
