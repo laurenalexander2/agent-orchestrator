@@ -1,68 +1,33 @@
 # claude-swarm
 
-> CLI for parallel Claude Code sessions to coordinate via SQLite.
-
-claude-swarm lets multiple AI coding agents (Claude Code sessions) working on the same codebase stay in sync, communicate, claim files, review each other's work, and push safely through a shared git lock. All state lives in a single SQLite database.
+> A CLI for coordinating multiple Claude Code sessions working on the same codebase. Shared context, messaging, file claims, peer reviews, and a serialized git lock — all backed by a single SQLite database.
 
 ## Install
 
     pip install claude-swarm
-
-    # or via Homebrew
     brew tap laurenalexander2/tap && brew install claude-swarm
 
 Requires Python 3.11+.
 
 ## Quick Start
 
-    ao setup                                    # verify Claude Code is installed
-    ao start "Build a REST API with auth"       # launch orchestrator mode
+    ao setup                              # verify Claude Code is installed
+    ao start "Build a REST API with auth" # launch orchestrator mode
 
-This writes a CLAUDE.md, creates .claude-swarm/, launches Claude Code as orchestrator. The orchestrator decomposes the project into workstreams and prints copy-pasteable prompts for each session.
+## Documentation
 
-## Documentation (plain text, for LLMs)
-
-- llms-full.txt  — Complete reference (every command, every schema table, workflow)
-- commands.txt   — CLI command reference only
-- schema.txt     — Database schema only
-
-## Website (HTML, for humans)
-
-- index.html          — Landing page
-- docs.html           — Getting started + full CLI reference
-- architecture.html   — System design + database schema
-- contributing.html   — How to contribute
+- [Complete Reference](https://laurenalexander2.github.io/agent-orchestrator/llms-full.txt): Every command, every schema table, full workflow — everything in one file
+- [CLI Reference](https://laurenalexander2.github.io/agent-orchestrator/commands.txt): All commands with synopsis, options, defaults, and examples
+- [Database Schema](https://laurenalexander2.github.io/agent-orchestrator/schema.txt): All 6 CREATE TABLE statements with field descriptions and behavioral notes
+- [Getting Started + Docs](https://laurenalexander2.github.io/agent-orchestrator/docs.html): Install, workflow, full CLI reference
+- [Architecture](https://laurenalexander2.github.io/agent-orchestrator/architecture.html): System diagram, module map, schema, design decisions
+- [Contributing](https://laurenalexander2.github.io/agent-orchestrator/contributing.html): Dev setup, TDD workflow, guidelines, roadmap
 
 ## Source
 
-- GitHub: https://github.com/laurenalexander2/claude-swarm
-- PyPI: https://pypi.org/project/claude-swarm/
+- [GitHub](https://github.com/laurenalexander2/claude-swarm): Source code, issues, PRs
+- [PyPI](https://pypi.org/project/claude-swarm/): Package registry
 
-## Commands (summary)
+## Optional
 
-    claude-swarm init --sessions "A:frontend B:backend"
-    claude-swarm status
-    claude-swarm sync --session A
-    claude-swarm context add "API uses snake_case" --session A --category decision
-    claude-swarm context show
-    claude-swarm message B "expose the auth types?" --from A
-    claude-swarm inbox --session B
-    claude-swarm reply 1 "Done" --from B
-    claude-swarm update A --status blocked --note "waiting on B"
-    claude-swarm claim src/auth.py --session A
-    claude-swarm claims
-    claude-swarm unclaim src/auth.py --session A
-    claude-swarm review request --from A --to B --diff "$(git diff main)"
-    claude-swarm review list
-    claude-swarm review show 1
-    claude-swarm review approve 1 --from B --comment "lgtm"
-    claude-swarm review reject 1 --from B --comment "fix types"
-    claude-swarm merge-ok A
-    claude-swarm commit "add middleware" --session A
-    claude-swarm push --session A
-    claude-swarm pull --session A
-    claude-swarm git-status
-    claude-swarm git-diff --staged
-    claude-swarm git-log
-    claude-swarm orchestrate run --interval 10 --auto-approve
-    claude-swarm orchestrate dashboard
+- [Homepage](https://laurenalexander2.github.io/agent-orchestrator/): Overview, example walkthrough, quick start

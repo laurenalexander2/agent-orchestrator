@@ -63,6 +63,58 @@ Session A    Session B      (each in its own terminal)
      +-- review  +-- review   (peer approval)
      +-- push    +-- push     (lock-serialized)</pre>
 
+<h2>Example: Two Sessions Building Together</h2>
+
+<p>Initialize two sessions &mdash; one for backend, one for frontend:</p>
+<pre>$ claude-swarm init --sessions "A:backend B:frontend"
+Initialized with 2 sessions</pre>
+
+<p>Session A starts working. It claims its files and shares a decision:</p>
+<pre>$ claude-swarm claim src/api/routes.py --session A
+A claimed src/api/routes.py
+
+$ claude-swarm context add "All API responses use {data, error} envelope" --session A --category decision
+Context #1 added (decision)</pre>
+
+<p>Session B syncs and immediately sees A's decision:</p>
+<pre>$ claude-swarm sync --session B
+[SYNC] 1 new context
+CTX [decision] by=A: "All API responses use {data, error} envelope"</pre>
+
+<p>B has a question for A:</p>
+<pre>$ claude-swarm message A "What's the auth token format? Need it for the fetch headers" --from B
+Message #1 sent to A</pre>
+
+<p>A syncs, sees the message, and replies:</p>
+<pre>$ claude-swarm sync --session A
+[SYNC] 1 new message(s)
+MSG from=B: "What's the auth token format? Need it for the fetch headers"
+
+$ claude-swarm reply 1 "Bearer JWT in Authorization header" --from A
+Reply #2 sent to B</pre>
+
+<p>A finishes its work, commits, and requests a review:</p>
+<pre>$ claude-swarm commit "add user auth endpoints" --session A
+Committed: [Session A] add user auth endpoints
+
+$ claude-swarm review request --from A --to B --diff "$(git diff main)"
+Review #1 requested from B</pre>
+
+<p>B syncs, reviews, approves:</p>
+<pre>$ claude-swarm sync --session B
+[SYNC] 1 new message(s)
+MSG from=A: "Review #1 requested — run 'claude-swarm review show 1' to see diff"
+
+$ claude-swarm review approve 1 --from B --comment "looks good"
+Review #1 approved</pre>
+
+<p>A checks merge status and pushes:</p>
+<pre>$ claude-swarm merge-ok A
+A is clear to merge
+
+$ claude-swarm push --session A
+Push successful</pre>
+
 <h2>Pages</h2>
 <ul>
   <li><a href="docs.html">Docs</a> &mdash; install, workflow, full CLI reference</li>
