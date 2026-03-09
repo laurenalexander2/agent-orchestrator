@@ -4,16 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>claude-swarm</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<p><strong>claude-swarm</strong> &middot; <a href="index.html">Home</a> &middot; <a href="docs.html">Docs</a> &middot; <a href="architecture.html">Architecture</a> &middot; <a href="contributing.html">Contributing</a> &middot; <a href="https://github.com/laurenalexander2/agent-orchestrator">GitHub</a></p>
-<hr>
+<nav><div class="inner">
+  <a href="index.html" class="logo">claude-swarm</a>
+  <a href="docs.html">Docs for Humans</a>
+  <details><summary>Docs for LLMs</summary><div class="dropdown">
+    <a href="llms.txt">llms.txt <span>&mdash; summary and links</span></a>
+    <a href="llms-full.txt">llms-full.txt <span>&mdash; complete reference</span></a>
+    <a href="commands.txt">commands.txt <span>&mdash; CLI reference</span></a>
+    <a href="schema.txt">schema.txt <span>&mdash; database schema</span></a>
+  </div></details>
+  <a href="https://github.com/laurenalexander2/agent-orchestrator">GitHub</a>
+</div></nav>
 
+<main>
 <h1>claude-swarm</h1>
-<p>A CLI for coordinating multiple Claude Code sessions working on the same codebase. All state is stored in a single SQLite database.</p>
+<p class="hero-sub">Coordinate multiple Claude Code sessions on the same codebase. Shared context, messaging, file claims, peer review, and a serialized git lock &mdash; all backed by a single SQLite database.</p>
 
-<pre>pip install claude-swarm</pre>
-<pre>brew tap laurenalexander2/tap &amp;&amp; brew install claude-swarm</pre>
+<div class="install-row">
+  <pre>pip install claude-swarm</pre>
+  <pre>brew tap laurenalexander2/tap && brew install claude-swarm</pre>
+</div>
 <p>Requires Python 3.11+.</p>
 
 <h2>Quick Start</h2>
@@ -25,63 +38,60 @@ ao start "Build a REST API with auth"  # launch orchestrator mode</pre>
 <pre>claude-swarm init --sessions "A:frontend B:backend C:infra"
 claude-swarm status</pre>
 
-<h2>Example: Two Sessions Building Together</h2>
+<h2>Example</h2>
 
-<p>Initialize two sessions &mdash; one for backend, one for frontend:</p>
-<pre>$ claude-swarm init --sessions "A:backend B:frontend"
-Initialized with 2 sessions</pre>
+<p>Launch the orchestrator:</p>
+<pre>$ ao start "Build a REST API with auth and rate limiting"</pre>
 
-<p>Session A starts working. It claims its files and shares a decision:</p>
-<pre>$ claude-swarm claim src/api/routes.py --session A
-A claimed src/api/routes.py
+<p>The orchestrator explores your codebase, then presents a plan:</p>
+<pre>Here's my proposed decomposition:
 
+  Session A — Backend API
+  Task: Build Express routes, auth middleware, rate limiter
+  Files: src/api/, src/middleware/
+  Dependencies: none
+
+  Session B — Frontend
+  Task: Build React UI with login and dashboard
+  Files: src/components/, src/pages/
+  Dependencies: needs A's auth types
+
+Approve this plan, or tell me what to change.</pre>
+
+<p>You approve (or ask for changes). The orchestrator initializes sessions and prints a prompt for each one. You paste each prompt into a separate Claude Code terminal.</p>
+
+<p>From there, sessions coordinate automatically via the SQLite bus:</p>
+
+<pre># Session A shares a decision all sessions can see
 $ claude-swarm context add "All API responses use {data, error} envelope" --session A --category decision
-Context #1 added (decision)</pre>
 
-<p>Session B syncs and immediately sees A's decision:</p>
-<pre>$ claude-swarm sync --session B
+# Session B syncs and immediately picks it up
+$ claude-swarm sync --session B
 [SYNC] 1 new context
-CTX [decision] by=A: "All API responses use {data, error} envelope"</pre>
+CTX [decision] by=A: "All API responses use {data, error} envelope"
 
-<p>B has a question for A:</p>
-<pre>$ claude-swarm message A "What's the auth token format? Need it for the fetch headers" --from B
-Message #1 sent to A</pre>
+# B asks A a question
+$ claude-swarm message A "What's the auth token format?" --from B
 
-<p>A syncs, sees the message, and replies:</p>
-<pre>$ claude-swarm sync --session A
+# A syncs, sees it, replies
+$ claude-swarm sync --session A
 [SYNC] 1 new message(s)
-MSG from=B: "What's the auth token format? Need it for the fetch headers"
+MSG from=B: "What's the auth token format?"
 
 $ claude-swarm reply 1 "Bearer JWT in Authorization header" --from A
-Reply #2 sent to B</pre>
 
-<p>A finishes its work, commits, and requests a review:</p>
-<pre>$ claude-swarm commit "add user auth endpoints" --session A
-Committed: [Session A] add user auth endpoints
+# A finishes, commits, requests review
+$ claude-swarm commit "add user auth endpoints" --session A
+$ claude-swarm review request --from A --to orchestrator --diff "$(git diff main)"
 
-$ claude-swarm review request --from A --to B --diff "$(git diff main)"
-Review #1 requested from B</pre>
-
-<p>B syncs, reviews, approves:</p>
-<pre>$ claude-swarm sync --session B
-[SYNC] 1 new message(s)
-MSG from=A: "Review #1 requested — run 'claude-swarm review show 1' to see diff"
-
-$ claude-swarm review approve 1 --from B --comment "looks good"
-Review #1 approved</pre>
-
-<p>A checks merge status and pushes:</p>
-<pre>$ claude-swarm merge-ok A
+# Orchestrator approves, A pushes
+$ claude-swarm merge-ok A
 A is clear to merge
+$ claude-swarm push --session A</pre>
 
-$ claude-swarm push --session A
-Push successful</pre>
-
-<h2>Pages</h2>
+<h2>For Humans</h2>
 <ul>
-  <li><a href="docs.html">Docs</a> &mdash; install, workflow, full CLI reference</li>
-  <li><a href="architecture.html">Architecture</a> &mdash; module map, database schema, design decisions</li>
-  <li><a href="contributing.html">Contributing</a> &mdash; dev setup, guidelines, roadmap</li>
+  <li><a href="docs.html">Docs</a> &mdash; install, human commands, agent commands</li>
 </ul>
 
 <h2>For LLMs</h2>
@@ -91,8 +101,12 @@ Push successful</pre>
   <li><a href="commands.txt">commands.txt</a> &mdash; CLI reference only</li>
   <li><a href="schema.txt">schema.txt</a> &mdash; database schema only</li>
 </ul>
+</main>
 
-<hr>
-<p><a href="https://github.com/laurenalexander2/agent-orchestrator">GitHub</a> &middot; <a href="https://pypi.org/project/claude-swarm/">PyPI</a> &middot; MIT License</p>
+<footer>
+  <a href="https://github.com/laurenalexander2/agent-orchestrator">GitHub</a> &middot;
+  <a href="https://pypi.org/project/claude-swarm/">PyPI</a> &middot;
+  MIT License
+</footer>
 </body>
 </html>
