@@ -16,18 +16,6 @@
 <pre>brew tap laurenalexander2/tap &amp;&amp; brew install claude-swarm</pre>
 <p>Requires Python 3.11+.</p>
 
-<h2>What It Does</h2>
-<p>When multiple Claude Code sessions work on the same repo, they need a way to coordinate. claude-swarm provides:</p>
-<ul>
-  <li><strong>Shared context</strong> &mdash; a team wiki where sessions share decisions, interfaces, warnings, and conventions</li>
-  <li><strong>Sync</strong> &mdash; one command that checks inbox, reads new context, and sends a heartbeat</li>
-  <li><strong>Messaging</strong> &mdash; session-to-session messages with read/unread tracking</li>
-  <li><strong>File claims</strong> &mdash; exclusive file ownership so two sessions don't edit the same file</li>
-  <li><strong>Peer review</strong> &mdash; review requests, approval/rejection, merge gating</li>
-  <li><strong>Git lock</strong> &mdash; serialized pushes so concurrent rebases don't collide</li>
-  <li><strong>Orchestrator</strong> &mdash; a monitor that detects blocked/stale sessions and keeps things moving</li>
-</ul>
-
 <h2>Quick Start</h2>
 <pre>ao setup                              # check Claude Code is installed
 ao start "Build a REST API with auth"  # launch orchestrator mode</pre>
@@ -36,32 +24,6 @@ ao start "Build a REST API with auth"  # launch orchestrator mode</pre>
 <p>Or set up manually:</p>
 <pre>claude-swarm init --sessions "A:frontend B:backend C:infra"
 claude-swarm status</pre>
-
-<h2>How It Works</h2>
-<pre>
-ao start "Build X"
-     |
-     v
-Claude Code (orchestrator terminal)
-     |
-     +-- Plans workstreams
-     +-- Runs: claude-swarm init --sessions "..."
-     +-- Prints copy-paste prompts for each session
-     +-- Starts: claude-swarm orchestrate run
-           |
-           v
-     Monitors all sessions via SQLite bus
-           |
-     +-----+-----+
-     v           v
-Session A    Session B      (each in its own terminal)
-     |           |
-     +-- sync    +-- sync     (inbox + context + heartbeat)
-     +-- claim   +-- claim    (exclusive file access)
-     +-- context +-- context  (share decisions)
-     +-- commit  +-- commit   (session-prefixed)
-     +-- review  +-- review   (peer approval)
-     +-- push    +-- push     (lock-serialized)</pre>
 
 <h2>Example: Two Sessions Building Together</h2>
 
