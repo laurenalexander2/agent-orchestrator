@@ -5,7 +5,7 @@ Thanks for your interest in contributing!
 ## Getting Started
 
 ```bash
-git clone https://github.com/laurenalexander2/claude-swarm.git
+git clone https://github.com/laurenalexander2/agent-orchestrator.git
 cd claude-swarm
 pip install -e .
 pytest tests/ -v

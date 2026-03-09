@@ -446,5 +446,5 @@ Categories: "decision", "interface", "warning", "convention", "discovery". Times
 
 ## Source
 
-- GitHub: https://github.com/laurenalexander2/claude-swarm
+- GitHub: https://github.com/laurenalexander2/agent-orchestrator
 - PyPI: https://pypi.org/project/claude-swarm/

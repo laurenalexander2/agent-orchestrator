@@ -18,7 +18,7 @@ console = Console()
 CLAUDE_MD_SECTION = """
 ## Claude Swarm
 
-This project uses [claude-swarm](https://github.com/laurenalexander2/claude-swarm) to coordinate parallel Claude Code sessions.
+This project uses [claude-swarm](https://github.com/laurenalexander2/agent-orchestrator) to coordinate parallel Claude Code sessions.
 
 ### Database
 

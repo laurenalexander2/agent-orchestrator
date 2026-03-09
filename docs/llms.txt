@@ -25,7 +25,7 @@ Requires Python 3.11+.
 
 ## Source
 
-- [GitHub](https://github.com/laurenalexander2/claude-swarm): Source code, issues, PRs
+- [GitHub](https://github.com/laurenalexander2/agent-orchestrator): Source code, issues, PRs
 - [PyPI](https://pypi.org/project/claude-swarm/): Package registry
 
 ## Optional

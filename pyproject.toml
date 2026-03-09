@@ -25,9 +25,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/laurenalexander2/claude-swarm"
-Repository = "https://github.com/laurenalexander2/claude-swarm"
-Issues = "https://github.com/laurenalexander2/claude-swarm/issues"
+Homepage = "https://github.com/laurenalexander2/agent-orchestrator"
+Repository = "https://github.com/laurenalexander2/agent-orchestrator"
+Issues = "https://github.com/laurenalexander2/agent-orchestrator/issues"
 
 [project.scripts]
 claude-swarm = "claude_swarm.cli:main"
