@@ -14,174 +14,364 @@
 <h2>Install</h2>
 <pre>pip install claude-swarm</pre>
 <pre>brew tap laurenalexander2/tap &amp;&amp; brew install claude-swarm</pre>
-<p>Requires Python 3.11+. Dependencies: <code>click</code>, <code>rich</code>.</p>
+<p>Requires Python 3.11+.</p>
 
 <h2>Getting Started</h2>
 <pre>ao setup                              # check Claude Code is installed
 ao start "Build a REST API with auth"  # launch orchestrator mode</pre>
-<p><code>ao start</code> creates <code>.claude-swarm/</code>, writes a <code>CLAUDE.md</code>, and launches Claude Code as orchestrator. The orchestrator splits the project into workstreams and prints a prompt for each session. You paste each into a separate terminal.</p>
-<p>Manual setup:</p>
-<pre>claude-swarm init --sessions "A:frontend B:backend C:infra"
-claude-swarm status</pre>
+<p>Or set up manually:</p>
+<pre>claude-swarm init --sessions "A:frontend B:backend C:infra"</pre>
 
 <h2>Workflow</h2>
 <ol>
   <li>Pull before starting</li>
-  <li>Sync between every task &mdash; <code>claude-swarm sync --session ID</code></li>
-  <li>Share decisions via <code>context add</code> when you make choices that affect others</li>
+  <li>Sync between every task</li>
+  <li>Share decisions via <code>context add</code></li>
   <li>Claim files before editing</li>
-  <li>Update status when starting, blocking, or completing</li>
-  <li>Commit often with small, focused commits</li>
-  <li>Request review when ready to merge</li>
+  <li>Update status when blocking or completing</li>
+  <li>Commit often</li>
+  <li>Request review when ready</li>
   <li>Wait for <code>merge-ok</code> before pushing</li>
-  <li>Push only via CLI &mdash; never raw <code>git push</code></li>
+  <li>Push only via CLI</li>
   <li>Never force push</li>
 </ol>
 
-<h2>Global Options</h2>
-<pre>claude-swarm --db PATH COMMAND      # specify database path
-claude-swarm --version              # print version
-export CLAUDE_SWARM_DB=".claude-swarm/bus.db"  # env var alternative</pre>
-
 <h2>CLI Reference</h2>
 
+<pre>
+Usage: claude-swarm [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --version  Show the version and exit.
+  --db TEXT  Path to bus database
+  --help     Show this message and exit.
+
+Commands:
+  claim        Claim a file for exclusive editing.
+  claims       List all file claims.
+  commit       Commit staged changes with session-prefixed message.
+  context      Shared context management commands.
+  git-diff     Show git diff.
+  git-log      Show recent git log.
+  git-status   Show git status.
+  inbox        Check unread messages for a session.
+  init         Initialize the orchestrator database and register sessions.
+  merge-ok     Check if a session is clear to merge (all reviews approved).
+  message      Send a message to another session.
+  orchestrate  Orchestrator mode — monitor and coordinate sessions.
+  pull         Pull and rebase.
+  push         Push changes (acquires lock, rebases, pushes, releases).
+  reply        Reply to a message (marks original as read and sends reply).
+  review       Review management commands.
+  status       Show all sessions and their status.
+  sync         Sync: check inbox, read new context, heartbeat.
+  unclaim      Release a file claim.
+  update       Update a session's status or note.</pre>
+
+<p>The <code>--db</code> option can also be set via <code>CLAUDE_SWARM_DB</code> environment variable.</p>
+
+<!-- SYNC -->
 <h3 id="sync">sync</h3>
-<p>Check inbox, read new shared context, send heartbeat. Run between every task.</p>
-<pre>claude-swarm sync --session A</pre>
-<p><code>--session</code> (required) &mdash; Session ID</p>
-<p>Silent when nothing is new. When there is something new:</p>
-<pre>[SYNC] 1 new message(s), 2 new context
+<pre>
+Usage: claude-swarm sync [OPTIONS]
+
+  Sync: check inbox, read new context, heartbeat. Silent when nothing new.
+
+Options:
+  --session TEXT  Session ID to sync  [required]</pre>
+<pre>$ claude-swarm sync --session A
+[SYNC] 1 new message(s), 2 new context
 MSG from=B: "Auth types are exported now"
 CTX [decision] by=B: "JWT for auth, not session cookies"</pre>
 
+<!-- CONTEXT -->
+<h3 id="context">context</h3>
+<pre>
+Usage: claude-swarm context [OPTIONS] COMMAND [ARGS]...
+
+  Shared context management commands.
+
+Commands:
+  add   Add a shared context entry.
+  show  Show all shared context entries.</pre>
+
 <h3 id="context-add">context add</h3>
-<p>Add a shared context entry.</p>
-<pre>claude-swarm context add "API uses snake_case for all fields" --session A --category decision</pre>
-<p><code>--session</code> (required) &mdash; Session ID<br>
-<code>--category</code> (required) &mdash; One of: decision, interface, warning, convention, discovery</p>
+<pre>
+Usage: claude-swarm context add [OPTIONS] BODY
+
+  Add a shared context entry.
+
+Options:
+  --session TEXT                  Session ID adding the context  [required]
+  --category [decision|interface|warning|convention|discovery]
+                                  Context category  [required]</pre>
+<pre>$ claude-swarm context add "API uses snake_case for all fields" --session A --category decision</pre>
 
 <h3 id="context-show">context show</h3>
-<pre>claude-swarm context show</pre>
+<pre>
+Usage: claude-swarm context show [OPTIONS]
 
+  Show all shared context entries.</pre>
+
+<!-- MESSAGING -->
 <h3 id="message">message</h3>
-<pre>claude-swarm message B "Can you expose the auth types?" --from A</pre>
-<p><code>TO_ID</code> (arg) &mdash; Recipient<br>
-<code>BODY</code> (arg) &mdash; Message text<br>
-<code>--from</code> (required) &mdash; Sender session ID</p>
+<pre>
+Usage: claude-swarm message [OPTIONS] TO_ID BODY
+
+  Send a message to another session.
+
+Options:
+  --from TEXT  Sender session ID  [required]</pre>
+<pre>$ claude-swarm message B "Can you expose the auth types?" --from A</pre>
 
 <h3 id="inbox">inbox</h3>
-<pre>claude-swarm inbox --session B</pre>
-<p><code>--session</code> (required) &mdash; Session ID</p>
+<pre>
+Usage: claude-swarm inbox [OPTIONS]
+
+  Check unread messages for a session.
+
+Options:
+  --session TEXT  Session ID to check inbox for  [required]</pre>
 
 <h3 id="reply">reply</h3>
-<p>Marks original as read, sends reply to original sender.</p>
-<pre>claude-swarm reply 1 "Done, exported from auth/types.ts" --from B</pre>
-<p><code>MESSAGE_ID</code> (arg) &mdash; ID of message to reply to<br>
-<code>BODY</code> (arg) &mdash; Reply text<br>
-<code>--from</code> (required) &mdash; Sender session ID</p>
+<pre>
+Usage: claude-swarm reply [OPTIONS] MESSAGE_ID BODY
 
+  Reply to a message (marks original as read and sends reply).
+
+Options:
+  --from TEXT  Sender session ID  [required]</pre>
+<pre>$ claude-swarm reply 1 "Done, exported from auth/types.ts" --from B</pre>
+
+<!-- INIT & STATUS -->
 <h3 id="init">init</h3>
-<pre>claude-swarm init --sessions "A:frontend B:backend C:infra"</pre>
-<p><code>--sessions</code> (required) &mdash; Space-separated "ID:workstream" pairs</p>
+<pre>
+Usage: claude-swarm init [OPTIONS]
+
+  Initialize the orchestrator database and register sessions.
+
+Options:
+  --sessions TEXT  Space-separated "ID:workstream" pairs  [required]</pre>
+<pre>$ claude-swarm init --sessions "A:frontend B:backend C:infra"</pre>
 
 <h3 id="status">status</h3>
-<pre>claude-swarm status</pre>
+<pre>
+Usage: claude-swarm status [OPTIONS]
+
+  Show all sessions and their status.</pre>
 
 <h3 id="update">update</h3>
-<pre>claude-swarm update A --status blocked --note "waiting on B for types"</pre>
-<p><code>SESSION_ID</code> (arg) &mdash; Session to update<br>
-<code>--status</code> &mdash; running, blocked, or done<br>
-<code>--note</code> &mdash; Status note</p>
+<pre>
+Usage: claude-swarm update [OPTIONS] SESSION_ID
 
+  Update a session's status or note.
+
+Options:
+  --status TEXT  New status
+  --note TEXT    Status note</pre>
+<pre>$ claude-swarm update A --status blocked --note "waiting on B for types"</pre>
+
+<!-- FILE CLAIMS -->
 <h3 id="claim">claim</h3>
-<p>Claim a file for exclusive editing. Exit 1 if already claimed by another session.</p>
-<pre>claude-swarm claim src/auth/middleware.py --session A</pre>
-<p><code>FILE_PATH</code> (arg) &mdash; Path to file<br>
-<code>--session</code> (required) &mdash; Session ID</p>
+<pre>
+Usage: claude-swarm claim [OPTIONS] FILE_PATH
+
+  Claim a file for exclusive editing.
+
+Options:
+  --session TEXT  Session ID  [required]</pre>
+<pre>$ claude-swarm claim src/auth/middleware.py --session A</pre>
 
 <h3 id="claims">claims</h3>
-<pre>claude-swarm claims</pre>
+<pre>
+Usage: claude-swarm claims [OPTIONS]
+
+  List all file claims.</pre>
 
 <h3 id="unclaim">unclaim</h3>
-<pre>claude-swarm unclaim src/auth/middleware.py --session A</pre>
-<p><code>FILE_PATH</code> (arg) &mdash; Path to file<br>
-<code>--session</code> (required) &mdash; Session ID</p>
+<pre>
+Usage: claude-swarm unclaim [OPTIONS] FILE_PATH
+
+  Release a file claim.
+
+Options:
+  --session TEXT  Session ID  [required]</pre>
+
+<!-- REVIEW -->
+<h3 id="review">review</h3>
+<pre>
+Usage: claude-swarm review [OPTIONS] COMMAND [ARGS]...
+
+  Review management commands.
+
+Commands:
+  approve  Approve a review.
+  list     List all reviews.
+  reject   Reject a review.
+  request  Request a review from another session.
+  show     Show details of a specific review.</pre>
 
 <h3 id="review-request">review request</h3>
-<p>Sends a notification to the reviewer's inbox.</p>
-<pre>claude-swarm review request --from A --to B --diff "$(git diff main)"</pre>
-<p><code>--from</code> (required) &mdash; Requester session ID<br>
-<code>--to</code> (required) &mdash; Reviewer session ID<br>
-<code>--diff</code> (required) &mdash; Diff content</p>
+<pre>
+Usage: claude-swarm review request [OPTIONS]
+
+  Request a review from another session.
+
+Options:
+  --from TEXT  Requester session ID  [required]
+  --to TEXT    Reviewer session ID  [required]
+  --diff TEXT  Diff content  [required]</pre>
+<pre>$ claude-swarm review request --from A --to B --diff "$(git diff main)"</pre>
 
 <h3 id="review-list">review list</h3>
-<pre>claude-swarm review list</pre>
+<pre>
+Usage: claude-swarm review list [OPTIONS]
+
+  List all reviews.</pre>
 
 <h3 id="review-show">review show</h3>
-<pre>claude-swarm review show 1</pre>
+<pre>
+Usage: claude-swarm review show [OPTIONS] REVIEW_ID
+
+  Show details of a specific review.</pre>
 
 <h3 id="review-approve">review approve</h3>
-<p>Sends approval notification to requester.</p>
-<pre>claude-swarm review approve 1 --from B --comment "lgtm"</pre>
-<p><code>REVIEW_ID</code> (arg)<br>
-<code>--from</code> (required) &mdash; Reviewer session ID<br>
-<code>--comment</code> (optional) &mdash; Approval comment</p>
+<pre>
+Usage: claude-swarm review approve [OPTIONS] REVIEW_ID
+
+  Approve a review.
+
+Options:
+  --from TEXT     Reviewer session ID  [required]
+  --comment TEXT  Approval comment</pre>
+<pre>$ claude-swarm review approve 1 --from B --comment "lgtm"</pre>
 
 <h3 id="review-reject">review reject</h3>
-<p>Resets status to pending. Sends rejection notification to requester.</p>
-<pre>claude-swarm review reject 1 --from B --comment "fix the error types first"</pre>
-<p><code>REVIEW_ID</code> (arg)<br>
-<code>--from</code> (required) &mdash; Reviewer session ID<br>
-<code>--comment</code> (optional) &mdash; Rejection reason</p>
+<pre>
+Usage: claude-swarm review reject [OPTIONS] REVIEW_ID
 
+  Reject a review.
+
+Options:
+  --from TEXT     Reviewer session ID  [required]
+  --comment TEXT  Rejection comment</pre>
+
+<!-- MERGE -->
 <h3 id="merge-ok">merge-ok</h3>
-<p>Exit 0 if all reviews approved or no reviews. Exit 1 if any reviews pending.</p>
-<pre>claude-swarm merge-ok A</pre>
+<pre>
+Usage: claude-swarm merge-ok [OPTIONS] SESSION_ID
 
+  Check if a session is clear to merge (all reviews approved).</pre>
+<p>Exit 0 if clear. Exit 1 if blocked.</p>
+
+<!-- GIT -->
 <h3 id="commit">commit</h3>
-<p>Auto-prefixes message with session ID.</p>
-<pre>claude-swarm commit "add PII detection middleware" --session A
-# produces: [Session A] add PII detection middleware</pre>
-<p><code>DESCRIPTION</code> (arg) &mdash; Commit message<br>
-<code>--session</code> (required) &mdash; Session ID</p>
+<pre>
+Usage: claude-swarm commit [OPTIONS] DESCRIPTION
+
+  Commit staged changes with session-prefixed message.
+
+Options:
+  --session TEXT  Session ID  [required]</pre>
+<pre>$ claude-swarm commit "add PII detection middleware" --session A
+Committed: [Session A] add PII detection middleware</pre>
 
 <h3 id="push">push</h3>
-<p>Acquires git lock, rebases, pushes, releases lock. On failure, sets session status to "blocked".</p>
-<pre>claude-swarm push --session A</pre>
-<p><code>--session</code> (required) &mdash; Session ID</p>
+<pre>
+Usage: claude-swarm push [OPTIONS]
+
+  Push changes (acquires lock, rebases, pushes, releases).
+
+Options:
+  --session TEXT  Session ID  [required]</pre>
+<p>On failure, sets session status to "blocked" with note "push failed".</p>
 
 <h3 id="pull">pull</h3>
-<pre>claude-swarm pull --session A</pre>
-<p><code>--session</code> (required) &mdash; Session ID</p>
+<pre>
+Usage: claude-swarm pull [OPTIONS]
+
+  Pull and rebase.
+
+Options:
+  --session TEXT  Session ID  [required]</pre>
 
 <h3 id="git-status">git-status</h3>
-<pre>claude-swarm git-status</pre>
+<pre>
+Usage: claude-swarm git-status [OPTIONS]
+
+  Show git status.</pre>
 
 <h3 id="git-diff">git-diff</h3>
-<pre>claude-swarm git-diff --staged</pre>
-<p><code>--staged</code> (flag) &mdash; Show only staged changes</p>
+<pre>
+Usage: claude-swarm git-diff [OPTIONS]
+
+  Show git diff.
+
+Options:
+  --staged  Show staged changes</pre>
 
 <h3 id="git-log">git-log</h3>
-<pre>claude-swarm git-log</pre>
+<pre>
+Usage: claude-swarm git-log [OPTIONS]
+
+  Show recent git log.</pre>
+
+<!-- ORCHESTRATE -->
+<h3 id="orchestrate">orchestrate</h3>
+<pre>
+Usage: claude-swarm orchestrate [OPTIONS] COMMAND [ARGS]...
+
+  Orchestrator mode — monitor and coordinate sessions.
+
+Commands:
+  dashboard  One-shot status dashboard (sessions + inbox + reviews + claims).
+  run        Start the orchestrator poll loop.</pre>
 
 <h3 id="orchestrate-run">orchestrate run</h3>
-<p>Continuous poll loop. Detects blocked/stale sessions, pending reviews, unread messages.</p>
-<pre>claude-swarm orchestrate run --interval 10 --auto-approve</pre>
-<p><code>--interval</code> (default 10) &mdash; Poll interval in seconds<br>
-<code>--auto-approve</code> (flag) &mdash; Auto-approve reviews assigned to orchestrator<br>
-<code>--stale-minutes</code> (default 15) &mdash; Minutes before session is considered stale<br>
-<code>--quiet</code> (flag) &mdash; Only print when there are events</p>
+<pre>
+Usage: claude-swarm orchestrate run [OPTIONS]
+
+  Start the orchestrator poll loop.
+
+Options:
+  --interval INTEGER       Poll interval in seconds
+  --auto-approve           Auto-approve reviews assigned to orchestrator
+  --stale-minutes INTEGER  Minutes before a session is considered stale
+  --quiet                  Only print when there are events</pre>
+<pre>$ claude-swarm orchestrate run --interval 10 --auto-approve</pre>
 
 <h3 id="orchestrate-dashboard">orchestrate dashboard</h3>
-<pre>claude-swarm orchestrate dashboard</pre>
+<pre>
+Usage: claude-swarm orchestrate dashboard [OPTIONS]
+
+  One-shot status dashboard (sessions + inbox + reviews + claims).</pre>
+
+<!-- AO -->
+<h3 id="ao">ao</h3>
+<pre>
+Usage: ao [OPTIONS] COMMAND [ARGS]...
+
+  ao — orchestrate parallel Claude Code sessions.
+
+Commands:
+  setup  Check that Claude Code CLI is installed.
+  start  Launch orchestrator mode in Claude Code.</pre>
 
 <h3 id="ao-setup">ao setup</h3>
-<pre>ao setup</pre>
+<pre>
+Usage: ao setup [OPTIONS]
+
+  Check that Claude Code CLI is installed.</pre>
 
 <h3 id="ao-start">ao start</h3>
-<pre>ao start "Build a REST API with auth" --project-dir .</pre>
-<p><code>DESCRIPTION</code> (arg) &mdash; Project description<br>
-<code>--project-dir</code> (default ".") &mdash; Project directory</p>
+<pre>
+Usage: ao start [OPTIONS] DESCRIPTION
+
+  Launch orchestrator mode in Claude Code.
+
+Options:
+  --project-dir TEXT  Project directory</pre>
+<pre>$ ao start "Build a REST API with auth and rate limiting"</pre>
 
 <hr>
 <p><a href="https://github.com/laurenalexander2/claude-swarm">GitHub</a> &middot; <a href="https://pypi.org/project/claude-swarm/">PyPI</a> &middot; MIT License</p>
