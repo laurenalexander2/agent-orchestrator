@@ -195,11 +195,27 @@ The user wants to build:
 
 You have claude-swarm installed. Read the CLAUDE.md in this directory for the full command reference.
 
-Your job:
-1. Analyze the project and decompose it into parallel workstreams (e.g., A:frontend, B:backend, C:infra)
-2. Run the init command to register all sessions:
+Your job has two phases: PLAN first, then EXECUTE.
+
+## Phase 1: Plan
+
+1. Explore the codebase and analyze what exists vs. what needs to be built.
+2. Decompose the project into parallel workstreams. For each one, define:
+   - Session ID and name (e.g., A:backend, B:frontend)
+   - Specific task: what this session will build
+   - Files owned: which files/directories this session will create or modify
+   - Dependencies: what it needs from other sessions before it can start or finish
+   - Output: what it produces that other sessions need (types, APIs, configs)
+3. Present the plan to the user. Show all workstreams, their tasks, file ownership, dependencies, and suggested order of operations.
+4. Ask the user to approve, or tell you what to change.
+5. If the user requests changes, revise and present again.
+6. Do NOT proceed to Phase 2 until the user approves the plan.
+
+## Phase 2: Execute
+
+1. Run the init command to register all sessions:
    claude-swarm --db .claude-swarm/bus.db init --sessions "orchestrator:orchestrator A:workstream-name B:workstream-name ..."
-3. For each workstream, print a clearly labeled, copy-pasteable prompt block that the user will paste into a new Claude Code terminal. Each prompt block must:
+2. For each workstream, print a clearly labeled, copy-pasteable prompt block that the user will paste into a new Claude Code terminal. Each prompt block must:
    - Be enclosed in a visible border (use ``` or a clear delimiter like ═══)
    - Have a header like "SESSION A — Frontend" so the user knows which terminal it's for
    - Include the session ID, workstream description, and specific task instructions
@@ -207,13 +223,14 @@ Your job:
    - Emphasize that the session must run `sync` between every task — this checks inbox, reads shared context, and sends a heartbeat all in one command
    - Tell the session to write to shared context whenever it makes a decision that affects other sessions (API formats, interfaces, conventions, warnings)
    - Be completely self-contained — the session should not need any other context
-4. After printing all prompts, tell the user: "Open a new Claude Code terminal for each session above. Paste the prompt to start it. Then come back here and press Enter to start the orchestrator monitor."
-5. Wait for the user to confirm, then run:
+3. After printing all prompts, tell the user: "Open a new Claude Code terminal for each session above. Paste the prompt to start it. Then come back here and press Enter to start the orchestrator monitor."
+4. Wait for the user to confirm, then run:
    claude-swarm --db .claude-swarm/bus.db orchestrate run --interval 10
-6. Monitor the dashboard and respond to messages, reviews, and blocked sessions
+5. Monitor the dashboard and respond to messages, reviews, and blocked sessions
 
 Important:
 - You are session "orchestrator"
+- ALWAYS complete Phase 1 (plan + user approval) before Phase 2
 - Do NOT use the Task tool to spawn sub-agents. Each session runs in its own terminal.
 - Print prompts the user can copy-paste — that's how sessions get started.
 - Each prompt must be ready to paste directly into `claude` in a new terminal

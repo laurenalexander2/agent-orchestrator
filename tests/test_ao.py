@@ -143,3 +143,14 @@ class TestStart:
         claude_md = os.path.join(project_dir, "CLAUDE.md")
         content = open(claude_md).read()
         assert content.count("## Claude Swarm") == 1
+
+    def test_prompt_has_plan_phase(self, ao_env):
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            runner.invoke(ao_main, ["start", "Build an API", "--project-dir", project_dir])
+        prompt = mock_run.call_args[0][0][1]
+        assert "Phase 1" in prompt or "PLAN" in prompt.upper()
+        assert "approve" in prompt.lower()
+        assert "Phase 2" in prompt or "EXECUTE" in prompt.upper()
