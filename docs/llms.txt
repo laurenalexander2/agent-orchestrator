@@ -11,7 +11,6 @@ Requires Python 3.11+.
 
 ## Quick Start
 
-    ao setup                              # verify Claude Code is installed
     ao start "Build a REST API with auth" # launch orchestrator mode
 
 ## Documentation
@@ -19,9 +18,7 @@ Requires Python 3.11+.
 - [Complete Reference](https://laurenalexander2.github.io/agent-orchestrator/llms-full.txt): Every command, every schema table, full workflow — everything in one file
 - [CLI Reference](https://laurenalexander2.github.io/agent-orchestrator/commands.txt): All commands with synopsis, options, defaults, and examples
 - [Database Schema](https://laurenalexander2.github.io/agent-orchestrator/schema.txt): All 6 CREATE TABLE statements with field descriptions and behavioral notes
-- [Getting Started + Docs](https://laurenalexander2.github.io/agent-orchestrator/docs.html): Install, workflow, full CLI reference
-- [Architecture](https://laurenalexander2.github.io/agent-orchestrator/architecture.html): System diagram, module map, schema, design decisions
-- [Contributing](https://laurenalexander2.github.io/agent-orchestrator/contributing.html): Dev setup, TDD workflow, guidelines, roadmap
+- [Docs](https://laurenalexander2.github.io/agent-orchestrator/docs.html): Install, human commands, agent commands
 
 ## Source
 

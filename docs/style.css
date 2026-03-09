@@ -113,6 +113,90 @@ main {
   padding: 3rem 2rem 6rem;
 }
 
+/* --- SIDEBAR LAYOUT --- */
+.with-sidebar {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  gap: 2rem;
+  padding: 0 2rem;
+}
+
+.with-sidebar aside {
+  position: sticky;
+  top: 3.8rem;
+  align-self: flex-start;
+  width: 200px;
+  flex-shrink: 0;
+  padding: 1.5rem 0;
+  height: calc(100vh - 3.8rem);
+  overflow-y: auto;
+}
+
+.with-sidebar aside a {
+  display: block;
+  padding: 0.25rem 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.with-sidebar aside a:hover,
+.with-sidebar aside a.active {
+  color: var(--text);
+}
+
+.with-sidebar aside details {
+  margin-top: 0.8rem;
+}
+
+.with-sidebar aside details summary {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+  margin-bottom: 0.3rem;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.with-sidebar aside details summary::-webkit-details-marker { display: none; }
+
+.with-sidebar aside details summary:hover { opacity: 1; }
+
+.with-sidebar aside details[open] summary { opacity: 0.8; }
+
+.with-sidebar main {
+  flex: 1;
+  min-width: 0;
+  padding: 3rem 0 6rem;
+}
+
+@media (max-width: 768px) {
+  .with-sidebar {
+    flex-direction: column;
+    padding: 0 1.25rem;
+  }
+  .with-sidebar aside {
+    position: static;
+    width: 100%;
+    height: auto;
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1rem;
+  }
+  .with-sidebar aside .section-label {
+    width: 100%;
+    margin-top: 0.6rem;
+  }
+}
+
 /* --- TYPOGRAPHY --- */
 h1 {
   font-size: 2.4rem;
@@ -253,6 +337,34 @@ footer {
 footer a { color: var(--text-muted); }
 footer a:hover { color: var(--text); }
 
+/* --- SESSION STEPS --- */
+.session-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.session-step .label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 1.5rem;
+  padding-top: 1rem;
+  text-align: right;
+  opacity: 0.5;
+}
+
+.session-step pre {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
 /* --- RESPONSIVE --- */
 @media (max-width: 640px) {
   html { font-size: 14px; }
@@ -261,4 +373,5 @@ footer a:hover { color: var(--text); }
   h1 { font-size: 1.8rem; }
   .install-row { flex-direction: column; }
   .install-row pre { min-width: 0; }
+  .session-step .label { width: 1.2rem; font-size: 0.65rem; }
 }

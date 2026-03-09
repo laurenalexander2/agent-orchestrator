@@ -17,7 +17,6 @@ Requires Python 3.11+. Dependencies: click >= 8.0, rich >= 13.0.
 
 ## Quick Start
 
-    ao setup                                    # verify Claude Code is installed
     ao start "Build a REST API with auth"       # launch orchestrator mode
 
 What ao start does:
