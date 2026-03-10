@@ -23,37 +23,150 @@
 
 <main>
 <div class="hero">
-  <div class="badge">Open Source &middot; MIT License</div>
-  <h1>No agent should have to code alone.</h1>
-  <p class="hero-sub">Coordinate multiple Claude Code sessions on the same codebase. Shared context, messaging, file claims, peer review, and a serialized git lock &mdash; all in one SQLite database.</p>
-  <div class="install-row">
-    <div class="install-cmd" onclick="navigator.clipboard.writeText('pip install claude-swarm')">
-      <span class="prompt">$</span> pip install claude-swarm
-      <span class="copy-hint">Click to copy</span>
+  <div class="hero-inner">
+    <div class="badge">Open Source &middot; MIT License</div>
+    <h1><span class="line1">Because no agent</span><br><span class="line2">should have to code alone.</span></h1>
+    <p class="hero-sub">Coordinate multiple Claude Code sessions on the same codebase. Shared context, messaging, file claims, peer review, and a serialized git lock.</p>
+    <div class="install-row">
+      <div class="install-cmd" onclick="navigator.clipboard.writeText('pip install claude-swarm')">
+        <span class="prompt">$</span> pip install claude-swarm
+        <span class="copy-hint">Click to copy</span>
+      </div>
     </div>
+    <p class="install-alt">or: <code>brew tap laurenalexander2/tap && brew install claude-swarm</code></p>
   </div>
-  <p class="install-alt">or: <code>brew tap laurenalexander2/tap && brew install claude-swarm</code></p>
 </div>
 
 <div class="section">
   <h2>Quick Start</h2>
   <pre>$ ao start "Build a REST API with auth"</pre>
-  <p>That's it. The orchestrator explores your codebase, proposes a plan, waits for your approval, then prints a prompt for each session. Paste each prompt into a separate Claude Code terminal.</p>
+  <p>That's it. One command. The orchestrator scans your codebase, proposes a plan, and waits for your approval. Then it prints a prompt for each agent session &mdash; paste each into a separate Claude Code terminal and they coordinate automatically.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Orchestrator scans your codebase</strong>
+        <p>Reads your project structure, dependencies, and existing code to understand what's there.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Proposes a plan &amp; splits into workstreams</strong>
+        <p>Decomposes the task into parallel sessions &mdash; e.g. frontend, backend, tests &mdash; and waits for your approval.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Prints a prompt per session</strong>
+        <p>Each prompt contains the agent's role, claimed files, and the full coordination protocol. Paste into a Claude Code terminal.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>Agents sync, message, and make decisions together</strong>
+        <p>All state lives in a single SQLite database. Agents sync between tasks via hooks, message each other through a shared bus, and broadcast decisions as shared context.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <strong>Peer review and a linear history</strong>
+        <p>Agents claim files before editing, review each other's changes, and commit through a serialized lock. No race conditions, no merge conflicts, no rebases, and no commits unchecked.</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="section">
-  <h2>For Humans</h2>
-  <ul>
-    <li><a href="docs.html">Docs</a> &mdash; install, human commands, agent commands</li>
-  </ul>
+  <h2>Coordination</h2>
+  <p>All state lives in a single SQLite database. No Redis, no message queues, no external services. Agents stay in sync by polling between tasks.</p>
 
-  <h2>For LLMs</h2>
-  <ul>
-    <li><a href="llms.txt">llms.txt</a> &mdash; summary and links</li>
-    <li><a href="llms-full.txt">llms-full.txt</a> &mdash; complete reference in one file</li>
-    <li><a href="commands.txt">commands.txt</a> &mdash; CLI reference only</li>
-    <li><a href="schema.txt">schema.txt</a> &mdash; database schema only</li>
-  </ul>
+  <div class="cmd-grid">
+    <div class="cmd-card">
+      <h3>Sync</h3>
+      <pre>ao sync --session A</pre>
+      <p>The most important command. Run between every task. Does three things in one call: checks inbox for new messages, reads shared context entries since last sync, and sends a heartbeat so the orchestrator knows the session is alive. Silent when nothing's new.</p>
+    </div>
+
+    <div class="cmd-card">
+      <h3>Message</h3>
+      <pre>ao message B "Can you expose the auth types?" --from A</pre>
+      <p>Send a direct message to another agent through the shared bus. Reply with <code>ao reply 1 "Done, exported from auth/types.ts" --from B</code>. Check unread messages anytime with <code>ao inbox --session A</code>.</p>
+    </div>
+
+    <div class="cmd-card">
+      <h3>Share Context</h3>
+      <pre>ao context add "JWT for auth, not session cookies" --session B --category decision</pre>
+      <p>Broadcast decisions, interfaces, warnings, conventions, and discoveries to all agents. Categories keep context organized. Every agent sees new entries on their next sync. View everything with <code>ao context show</code>.</p>
+    </div>
+
+    <div class="cmd-card">
+      <h3>Status Updates</h3>
+      <pre>ao update A --status blocked --note "waiting on B for types"</pre>
+      <p>Set your session status to <code>running</code>, <code>blocked</code>, or <code>done</code>. Add notes so the orchestrator and other agents know what's happening. View all sessions with <code>ao status</code>.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Code &amp; Ship</h2>
+  <p>File ownership, peer review, and serialized commits. Agents follow the same workflow as human teams &mdash; just faster.</p>
+
+  <div class="cmd-grid">
+    <div class="cmd-card">
+      <h3>Claim Files</h3>
+      <pre>ao claim src/auth.ts --session A</pre>
+      <p>Claim a file for exclusive editing. Exits with an error if another agent already holds the claim. View all claims with <code>ao claims</code>, release with <code>ao unclaim src/auth.ts --session A</code>.</p>
+    </div>
+
+    <div class="cmd-card">
+      <h3>Peer Review</h3>
+      <pre>ao review request --session A --reviewer B</pre>
+      <p>Request a code review from another agent before merging. The reviewer can approve with <code>ao review approve</code>, reject with <code>ao review reject</code>, or leave comments. View pending reviews with <code>ao review list</code>.</p>
+    </div>
+
+    <div class="cmd-card">
+      <h3>Commit &amp; Push</h3>
+      <pre>ao commit --session A -m "Add auth middleware"</pre>
+      <p>Commit through the serialized git lock &mdash; one agent at a time. Clean, linear history with no race conditions. Wait for <code>ao merge-ok --session A</code> before pushing. Push with <code>ao push --session A</code> &mdash; never raw <code>git push</code>.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Docs for Humans</h2>
+  <div class="docs-row">
+    <a href="docs.html" class="doc-link">
+      <strong>Docs</strong>
+      <span>Install, commands, workflows</span>
+    </a>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Docs for LLMs</h2>
+  <div class="docs-row">
+    <a href="llms-full.txt" class="doc-link">
+      <strong>llms-full.txt</strong>
+      <span>Complete reference in one file</span>
+    </a>
+    <a href="llms.txt" class="doc-link">
+      <strong>llms.txt</strong>
+      <span>Summary and links</span>
+    </a>
+    <a href="commands.txt" class="doc-link">
+      <strong>commands.txt</strong>
+      <span>CLI reference</span>
+    </a>
+    <a href="schema.txt" class="doc-link">
+      <strong>schema.txt</strong>
+      <span>Database schema</span>
+    </a>
+  </div>
 </div>
 </main>
 
@@ -62,5 +175,26 @@
   <a href="https://pypi.org/project/claude-swarm/">PyPI</a> &middot;
   MIT License
 </footer>
+
+<script>
+function fitHeroLines() {
+  const h1 = document.querySelector('.hero h1');
+  const line1 = document.querySelector('.hero .line1');
+  const line2 = document.querySelector('.hero .line2');
+  const container = document.querySelector('.hero-inner');
+  if (!h1 || !line1 || !line2 || !container) return;
+  const maxW = container.offsetWidth;
+
+  // Find the size where the longer line just fits
+  let size = 120;
+  h1.style.fontSize = size + 'px';
+  while ((line1.scrollWidth > maxW || line2.scrollWidth > maxW) && size > 16) {
+    size -= 0.5;
+    h1.style.fontSize = size + 'px';
+  }
+}
+fitHeroLines();
+window.addEventListener('resize', fitHeroLines);
+</script>
 </body>
 </html>
