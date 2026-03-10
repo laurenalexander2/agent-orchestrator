@@ -9,43 +9,52 @@
 <body>
 <nav><div class="inner">
   <a href="index.html" class="logo">claude-swarm</a>
-  <a href="docs.html">Docs for Humans</a>
-  <details><summary>Docs for LLMs</summary><div class="dropdown">
-    <a href="llms.txt">llms.txt <span>&mdash; summary and links</span></a>
-    <a href="llms-full.txt">llms-full.txt <span>&mdash; complete reference</span></a>
-    <a href="commands.txt">commands.txt <span>&mdash; CLI reference</span></a>
-    <a href="schema.txt">schema.txt <span>&mdash; database schema</span></a>
-  </div></details>
-  <a href="https://github.com/laurenalexander2/agent-orchestrator">GitHub</a>
+  <div class="nav-links">
+    <a href="docs.html">Docs for Humans</a>
+    <details><summary>Docs for LLMs</summary><div class="dropdown">
+      <a href="llms.txt">llms.txt <span>&mdash; summary and links</span></a>
+      <a href="llms-full.txt">llms-full.txt <span>&mdash; complete reference</span></a>
+      <a href="commands.txt">commands.txt <span>&mdash; CLI reference</span></a>
+      <a href="schema.txt">schema.txt <span>&mdash; database schema</span></a>
+    </div></details>
+    <a href="https://github.com/laurenalexander2/agent-orchestrator">GitHub</a>
+  </div>
 </div></nav>
 
 <main>
-<h1>claude-swarm</h1>
-<p class="hero-sub">Coordinate multiple Claude Code sessions on the same codebase. Shared context, messaging, file claims, peer review, and a serialized git lock &mdash; all backed by a single SQLite database.</p>
-
-<div class="install-row">
-  <pre>pip install claude-swarm</pre>
-  <pre>brew tap laurenalexander2/tap && brew install claude-swarm</pre>
+<div class="hero">
+  <div class="badge">Open Source &middot; MIT License</div>
+  <h1>No agent should have to code alone.</h1>
+  <p class="hero-sub">Coordinate multiple Claude Code sessions on the same codebase. Shared context, messaging, file claims, peer review, and a serialized git lock &mdash; all in one SQLite database.</p>
+  <div class="install-row">
+    <div class="install-cmd" onclick="navigator.clipboard.writeText('pip install claude-swarm')">
+      <span class="prompt">$</span> pip install claude-swarm
+      <span class="copy-hint">Click to copy</span>
+    </div>
+  </div>
+  <p class="install-alt">or: <code>brew tap laurenalexander2/tap && brew install claude-swarm</code></p>
 </div>
-<p>Requires Python 3.11+.</p>
 
-<h2>Quick Start</h2>
-<pre>ao start "Build a REST API with auth"</pre>
-<p>This creates a <code>.claude-swarm/</code> directory, writes a <code>CLAUDE.md</code> with the coordination protocol, and launches Claude Code as orchestrator. The orchestrator splits the project into workstreams and prints a prompt for each session. You paste each prompt into a separate Claude Code terminal.</p>
+<div class="section">
+  <h2>Quick Start</h2>
+  <pre>$ ao start "Build a REST API with auth"</pre>
+  <p>That's it. The orchestrator explores your codebase, proposes a plan, waits for your approval, then prints a prompt for each session. Paste each prompt into a separate Claude Code terminal.</p>
+</div>
 
+<div class="section">
+  <h2>For Humans</h2>
+  <ul>
+    <li><a href="docs.html">Docs</a> &mdash; install, human commands, agent commands</li>
+  </ul>
 
-<h2>For Humans</h2>
-<ul>
-  <li><a href="docs.html">Docs</a> &mdash; install, human commands, agent commands</li>
-</ul>
-
-<h2>For LLMs</h2>
-<ul>
-  <li><a href="llms.txt">llms.txt</a> &mdash; summary and links</li>
-  <li><a href="llms-full.txt">llms-full.txt</a> &mdash; complete reference in one file</li>
-  <li><a href="commands.txt">commands.txt</a> &mdash; CLI reference only</li>
-  <li><a href="schema.txt">schema.txt</a> &mdash; database schema only</li>
-</ul>
+  <h2>For LLMs</h2>
+  <ul>
+    <li><a href="llms.txt">llms.txt</a> &mdash; summary and links</li>
+    <li><a href="llms-full.txt">llms-full.txt</a> &mdash; complete reference in one file</li>
+    <li><a href="commands.txt">commands.txt</a> &mdash; CLI reference only</li>
+    <li><a href="schema.txt">schema.txt</a> &mdash; database schema only</li>
+  </ul>
+</div>
 </main>
 
 <footer>
