@@ -294,14 +294,16 @@ def setup():
 
 
 @main.command()
-@click.argument("description")
+@click.argument("description", nargs=-1, required=True)
 @click.option("--project-dir", default=".", help="Project directory")
 def start(description, project_dir):
     """Launch orchestrator mode in Claude Code.
 
     Example:
         ao start "Build a REST API with auth and rate limiting"
+        ao start Build a REST API with auth and rate limiting
     """
+    description = " ".join(description)
     project_dir = os.path.abspath(project_dir)
 
     if not _check_claude():

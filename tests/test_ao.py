@@ -144,6 +144,28 @@ class TestStart:
         content = open(claude_md).read()
         assert content.count("## Claude Swarm") == 1
 
+    def test_description_with_multiple_words_no_quotes(self, ao_env):
+        """ao start Build a REST API  (no quotes) should still work."""
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = runner.invoke(ao_main, ["start", "Build", "a", "REST", "API", "--project-dir", project_dir])
+        assert result.exit_code == 0
+        prompt = mock_run.call_args[0][0][1]
+        assert "Build a REST API" in prompt
+
+    def test_description_with_quotes_in_text(self, ao_env):
+        """Quotes inside the description should be preserved."""
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = runner.invoke(ao_main, ["start", 'Build an API that returns "hello"', "--project-dir", project_dir])
+        assert result.exit_code == 0
+        prompt = mock_run.call_args[0][0][1]
+        assert 'returns "hello"' in prompt
+
     def test_prompt_has_plan_phase(self, ao_env):
         runner, project_dir = ao_env
         with patch("claude_swarm.ao._check_claude", return_value=True), \
