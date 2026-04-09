@@ -294,16 +294,61 @@ def setup():
 
 
 @main.command()
-@click.argument("description", nargs=-1, required=True)
+@click.argument("description", nargs=-1, required=False)
+@click.option("--file", "-f", "file_path", type=click.Path(exists=True, dir_okay=False),
+              help="Read the plan from a file (sidesteps shell quoting).")
 @click.option("--project-dir", default=".", help="Project directory")
-def start(description, project_dir):
+def start(description, file_path, project_dir):
     """Launch orchestrator mode in Claude Code.
 
-    Example:
-        ao start "Build a REST API with auth and rate limiting"
-        ao start Build a REST API with auth and rate limiting
+    The plan can be provided in four ways:
+
+    \b
+        ao start "Build a REST API with auth"    # quoted args
+        ao start Build a REST API with auth      # unquoted args
+        ao start --file plan.md                  # from a file
+        pbpaste | ao start                       # from stdin
+        ao start < plan.md                       # from stdin redirect
+        ao start -                               # explicit stdin
+
+    Using --file or stdin avoids shell quoting issues with characters
+    like !, ', ", (, ), and $ that zsh/bash may try to interpret.
     """
-    description = " ".join(description)
+    args_text = " ".join(description).strip() if description else ""
+    explicit_stdin = args_text == "-"
+
+    if file_path and args_text and not explicit_stdin:
+        console.print("[red]Cannot combine --file with a description argument.[/red]")
+        sys.exit(1)
+
+    consumed_stdin = False
+    description_text: str
+
+    if file_path:
+        with open(file_path) as f:
+            description_text = f.read().strip()
+    elif explicit_stdin:
+        description_text = sys.stdin.read().strip()
+        consumed_stdin = True
+    elif args_text:
+        description_text = args_text
+    elif not sys.stdin.isatty():
+        # Piped input with no args: read it automatically.
+        description_text = sys.stdin.read().strip()
+        consumed_stdin = True
+    else:
+        console.print("[red]No plan provided.[/red]\n")
+        console.print("Provide a plan in one of these ways:")
+        console.print('  ao start "Build a REST API"')
+        console.print("  ao start --file plan.md")
+        console.print("  pbpaste | ao start")
+        console.print("  ao start < plan.md")
+        sys.exit(1)
+
+    if not description_text:
+        console.print("[red]Plan is empty.[/red]")
+        sys.exit(1)
+
     project_dir = os.path.abspath(project_dir)
 
     if not _check_claude():
@@ -318,9 +363,19 @@ def start(description, project_dir):
     console.print("[green]Created .claude-swarm/ directory[/green]")
     console.print("[bold]Launching Claude Code...[/bold]\n")
 
-    prompt = ORCHESTRATOR_PROMPT_TEMPLATE.format(description=description)
+    prompt = ORCHESTRATOR_PROMPT_TEMPLATE.format(description=description_text)
+
+    # If we consumed stdin from a pipe/redirect, reopen the controlling
+    # terminal so `claude` still has an interactive stdin.
+    stdin_for_claude = None
+    if consumed_stdin:
+        try:
+            stdin_for_claude = open("/dev/tty", "r")
+        except OSError:
+            pass
 
     subprocess.run(
         ["claude", prompt],
         cwd=project_dir,
+        stdin=stdin_for_claude,
     )

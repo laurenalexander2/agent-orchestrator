@@ -1,6 +1,6 @@
 [project]
 name = "claude-swarm"
-version = "0.3.1"
+version = "0.3.2"
 description = "CLI for parallel Claude Code sessions to coordinate via shared context, message bus, file claims, peer review gates, and git lock management"
 readme = "README.md"
 license = "MIT"
