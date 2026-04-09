@@ -227,19 +227,79 @@ class TestStart:
         prompt = mock_run.call_args[0][0][1]
         assert "Build something from explicit stdin" in prompt
 
-    def test_fails_when_no_plan_provided(self, ao_env):
-        """No args, no --file, and empty stdin → helpful error, no launch."""
+    def test_opens_editor_when_no_args_in_interactive_shell(self, ao_env):
+        """Interactive `ao start` (no args, no pipe) opens $EDITOR."""
+        runner, project_dir = ao_env
+        editor_result = (
+            "# This comment should be stripped\n"
+            "Build a thing with !important and 'quotes' and (parens)\n"
+            "# Another comment\n"
+        )
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("claude_swarm.ao._stdin_is_pipe", return_value=False), \
+             patch("claude_swarm.ao.click.edit", return_value=editor_result) as mock_edit, \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = runner.invoke(
+                ao_main,
+                ["start", "--project-dir", project_dir],
+            )
+        assert result.exit_code == 0, result.output
+        mock_edit.assert_called_once()
+        prompt = mock_run.call_args[0][0][1]
+        assert "!important" in prompt
+        assert "'quotes'" in prompt
+        assert "(parens)" in prompt
+        # Comments should not leak into the prompt
+        assert "This comment should be stripped" not in prompt
+
+    def test_editor_aborts_when_user_writes_nothing(self, ao_env):
+        """User saves with only comment lines → abort, no launch."""
         runner, project_dir = ao_env
         with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("claude_swarm.ao._stdin_is_pipe", return_value=False), \
+             patch("claude_swarm.ao.click.edit",
+                   return_value="# comment only\n#\n"), \
              patch("subprocess.run") as mock_run:
             result = runner.invoke(
                 ao_main,
                 ["start", "--project-dir", project_dir],
-                input="",
             )
         assert result.exit_code == 1
-        assert "plan" in result.output.lower()
+        assert "abort" in result.output.lower()
         mock_run.assert_not_called()
+
+    def test_editor_aborts_when_user_quits_without_saving(self, ao_env):
+        """click.edit returns None when user closes without saving."""
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("claude_swarm.ao._stdin_is_pipe", return_value=False), \
+             patch("claude_swarm.ao.click.edit", return_value=None), \
+             patch("subprocess.run") as mock_run:
+            result = runner.invoke(
+                ao_main,
+                ["start", "--project-dir", project_dir],
+            )
+        assert result.exit_code == 1
+        assert "abort" in result.output.lower()
+        mock_run.assert_not_called()
+
+    def test_editor_not_opened_when_args_given(self, ao_env):
+        """Args take precedence over editor."""
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("claude_swarm.ao._stdin_is_pipe", return_value=False), \
+             patch("claude_swarm.ao.click.edit") as mock_edit, \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = runner.invoke(
+                ao_main,
+                ["start", "Build a thing", "--project-dir", project_dir],
+            )
+        assert result.exit_code == 0, result.output
+        mock_edit.assert_not_called()
+        prompt = mock_run.call_args[0][0][1]
+        assert "Build a thing" in prompt
 
     def test_fails_when_file_and_args_both_given(self, ao_env, tmp_path):
         runner, project_dir = ao_env

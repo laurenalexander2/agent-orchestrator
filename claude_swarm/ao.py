@@ -267,13 +267,43 @@ def _ensure_ao_dir(project_dir: str) -> str:
     return ao_dir
 
 
+def _stdin_is_pipe() -> bool:
+    """True when stdin is connected to a pipe/file rather than a terminal."""
+    try:
+        return not sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+EDITOR_TEMPLATE = """\
+# Write or paste your plan below.
+# Lines starting with '#' are ignored.
+# Save and quit when done. Leave empty to abort.
+
+"""
+
+
+def _prompt_via_editor():
+    """Open $EDITOR for the user to type/paste a plan. Returns the plan
+    string with comment lines stripped, or None if the user aborted or
+    left it empty."""
+    edited = click.edit(EDITOR_TEMPLATE, extension=".md")
+    if edited is None:
+        return None
+    plan = "\n".join(
+        line for line in edited.splitlines()
+        if not line.lstrip().startswith("#")
+    ).strip()
+    return plan or None
+
+
 @click.group()
 def main():
     """ao — orchestrate parallel Claude Code sessions.
 
     Commands:
-        ao setup              Check that Claude Code is installed
-        ao start "Build X"    Launch orchestrator mode
+        ao setup     Check that Claude Code is installed
+        ao start     Launch orchestrator mode (opens editor for your plan)
     """
     pass
 
@@ -285,6 +315,7 @@ def setup():
         console.print("[green]Claude Code CLI found[/green]")
         console.print("[green]You're all set![/green]")
         console.print("\nTry:")
+        console.print("  ao start                  # opens editor for your plan")
         console.print('  ao start "Build a REST API with auth and rate limiting"')
     else:
         console.print("[red]Claude Code CLI not found.[/red]")
@@ -301,18 +332,20 @@ def setup():
 def start(description, file_path, project_dir):
     """Launch orchestrator mode in Claude Code.
 
-    The plan can be provided in four ways:
+    With no arguments, opens your $EDITOR so you can write or paste the
+    plan without fighting shell quoting. The plan can also be provided
+    in several other ways:
 
     \b
-        ao start "Build a REST API with auth"    # quoted args
-        ao start Build a REST API with auth      # unquoted args
+        ao start                                 # opens $EDITOR (recommended)
+        ao start "Build a REST API with auth"   # quoted args (short plans)
         ao start --file plan.md                  # from a file
         pbpaste | ao start                       # from stdin
         ao start < plan.md                       # from stdin redirect
         ao start -                               # explicit stdin
 
-    Using --file or stdin avoids shell quoting issues with characters
-    like !, ', ", (, ), and $ that zsh/bash may try to interpret.
+    The editor and --file/stdin paths sidestep shell quoting issues with
+    characters like !, ', ", (, ), and $ that zsh/bash may interpret.
     """
     args_text = " ".join(description).strip() if description else ""
     explicit_stdin = args_text == "-"
@@ -322,7 +355,7 @@ def start(description, file_path, project_dir):
         sys.exit(1)
 
     consumed_stdin = False
-    description_text: str
+    description_text = None
 
     if file_path:
         with open(file_path) as f:
@@ -332,18 +365,17 @@ def start(description, file_path, project_dir):
         consumed_stdin = True
     elif args_text:
         description_text = args_text
-    elif not sys.stdin.isatty():
+    elif _stdin_is_pipe():
         # Piped input with no args: read it automatically.
         description_text = sys.stdin.read().strip()
         consumed_stdin = True
     else:
-        console.print("[red]No plan provided.[/red]\n")
-        console.print("Provide a plan in one of these ways:")
-        console.print('  ao start "Build a REST API"')
-        console.print("  ao start --file plan.md")
-        console.print("  pbpaste | ao start")
-        console.print("  ao start < plan.md")
-        sys.exit(1)
+        # Interactive shell with no plan provided: open $EDITOR.
+        console.print("[bold]Opening editor for your plan...[/bold]")
+        description_text = _prompt_via_editor()
+        if not description_text:
+            console.print("[red]Aborted: no plan written.[/red]")
+            sys.exit(1)
 
     if not description_text:
         console.print("[red]Plan is empty.[/red]")
