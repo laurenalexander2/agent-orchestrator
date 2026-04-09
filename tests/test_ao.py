@@ -316,6 +316,56 @@ class TestStart:
         assert result.exit_code == 1
         mock_run.assert_not_called()
 
+    def test_max_files_per_session_default_in_prompt(self, ao_env):
+        """Default scope budget (10) should be referenced in the orchestrator prompt."""
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = runner.invoke(
+                ao_main,
+                ["start", "Build a thing", "--project-dir", project_dir],
+            )
+        assert result.exit_code == 0, result.output
+        prompt = mock_run.call_args[0][0][1]
+        assert "Context window budget" in prompt
+        assert "10 files" in prompt
+        assert "10-file budget" in prompt
+
+    def test_max_files_per_session_custom_value(self, ao_env):
+        """A custom --max-files-per-session value should propagate into the prompt."""
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = runner.invoke(
+                ao_main,
+                ["start", "Build a thing",
+                 "--max-files-per-session", "4",
+                 "--project-dir", project_dir],
+            )
+        assert result.exit_code == 0, result.output
+        prompt = mock_run.call_args[0][0][1]
+        assert "4 files" in prompt
+        assert "4-file budget" in prompt
+        # The default should NOT appear when overridden.
+        assert "10 files" not in prompt
+        assert "10-file budget" not in prompt
+
+    def test_orchestrator_prompt_warns_about_context_window(self, ao_env):
+        """The prompt must explicitly warn that sessions can run out of context."""
+        runner, project_dir = ao_env
+        with patch("claude_swarm.ao._check_claude", return_value=True), \
+             patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            runner.invoke(
+                ao_main,
+                ["start", "Build a thing", "--project-dir", project_dir],
+            )
+        prompt = mock_run.call_args[0][0][1]
+        assert "context window" in prompt.lower()
+        assert "split" in prompt.lower()
+
     def test_fails_when_file_is_empty(self, ao_env, tmp_path):
         runner, project_dir = ao_env
         plan_file = tmp_path / "empty.md"

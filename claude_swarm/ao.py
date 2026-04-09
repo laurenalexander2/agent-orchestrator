@@ -197,16 +197,39 @@ You have claude-swarm installed. Read the CLAUDE.md in this directory for the fu
 
 Your job has two phases: PLAN first, then EXECUTE.
 
+## Context window budget (CRITICAL — read first)
+
+Each session runs in its own Claude Code instance with a finite context window.
+If you hand a session too much work, it will exhaust its context mid-task and fail.
+
+Hard rules when planning workstreams — these override any other consideration:
+- No single session may own more than {max_files_per_session} files. If a workstream
+  needs to touch more than that, split it into multiple sessions (e.g. A1, A2)
+  with clearly partitioned file ownership.
+- Prefer many small, focused sessions over a few large ones.
+- Each session's task should be expressible in 5–10 concrete sub-steps.
+- If you cannot describe what a session does in two sentences, it is too big — split it.
+- Avoid sessions whose task requires reading large swaths of unfamiliar code; scope
+  each session to a localized area (one module, one feature, one layer).
+- When in doubt, split.
+
+You MUST verify every workstream against these rules before presenting the plan
+to the user, and call out the file count for each session in the plan.
+
 ## Phase 1: Plan
 
 1. Explore the codebase and analyze what exists vs. what needs to be built.
 2. Decompose the project into parallel workstreams. For each one, define:
    - Session ID and name (e.g., A:backend, B:frontend)
-   - Specific task: what this session will build
+   - Specific task: what this session will build (must fit in 5–10 sub-steps)
    - Files owned: which files/directories this session will create or modify
+     (MUST be ≤ {max_files_per_session} files — split the workstream if not)
+   - Estimated file count (and confirm it is within the budget)
    - Dependencies: what it needs from other sessions before it can start or finish
    - Output: what it produces that other sessions need (types, APIs, configs)
-3. Present the plan to the user. Show all workstreams, their tasks, file ownership, dependencies, and suggested order of operations.
+3. Present the plan to the user. Show all workstreams, their tasks, file ownership
+   (with file counts), dependencies, and suggested order of operations. Explicitly
+   note that every session is within the {max_files_per_session}-file budget.
 4. Ask the user to approve, or tell you what to change.
 5. If the user requests changes, revise and present again.
 6. Do NOT proceed to Phase 2 until the user approves the plan.
@@ -329,7 +352,11 @@ def setup():
 @click.option("--file", "-f", "file_path", type=click.Path(exists=True, dir_okay=False),
               help="Read the plan from a file (sidesteps shell quoting).")
 @click.option("--project-dir", default=".", help="Project directory")
-def start(description, file_path, project_dir):
+@click.option("--max-files-per-session", default=10, type=int, show_default=True,
+              help="Hard cap on the number of files any single session may own. "
+                   "Forces the orchestrator to split workstreams that exceed this "
+                   "budget so no session's context window risks filling up.")
+def start(description, file_path, project_dir, max_files_per_session):
     """Launch orchestrator mode in Claude Code.
 
     With no arguments, opens your $EDITOR so you can write or paste the
@@ -346,6 +373,10 @@ def start(description, file_path, project_dir):
 
     The editor and --file/stdin paths sidestep shell quoting issues with
     characters like !, ', ", (, ), and $ that zsh/bash may interpret.
+
+    Use --max-files-per-session to tighten or loosen the per-session scope
+    budget. Smaller values force the orchestrator to plan more, smaller
+    sessions, which protects each session's context window.
     """
     args_text = " ".join(description).strip() if description else ""
     explicit_stdin = args_text == "-"
@@ -395,7 +426,10 @@ def start(description, file_path, project_dir):
     console.print("[green]Created .claude-swarm/ directory[/green]")
     console.print("[bold]Launching Claude Code...[/bold]\n")
 
-    prompt = ORCHESTRATOR_PROMPT_TEMPLATE.format(description=description_text)
+    prompt = ORCHESTRATOR_PROMPT_TEMPLATE.format(
+        description=description_text,
+        max_files_per_session=max_files_per_session,
+    )
 
     # If we consumed stdin from a pipe/redirect, reopen the controlling
     # terminal so `claude` still has an interactive stdin.
